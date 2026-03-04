@@ -165,12 +165,27 @@ export async function logDealActivity(
 
 /** Fetch all activity records for a deal */
 export async function fetchDealActivities(dealId: string) {
-    const { data, error } = await supabase
+    const { data: links } = await supabase
+        .from('links')
+        .select('from_id')
+        .eq('from_type', 'note')
+        .eq('to_type', 'deal')
+        .eq('to_id', dealId)
+
+    const noteIds = Array.from(new Set(links?.map(l => l.from_id) || []))
+
+    let query = supabase
         .from('activities')
         .select('*')
-        .eq('entity_type', 'deal')
-        .eq('entity_id', dealId)
         .order('created_at', { ascending: false })
+
+    const chunks = [`and(entity_type.eq.deal,entity_id.eq.${dealId})`]
+    if (noteIds.length > 0) {
+        chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
+    }
+    query = query.or(chunks.join(','))
+
+    const { data, error } = await query
 
     if (error) throw error
     return data ?? []

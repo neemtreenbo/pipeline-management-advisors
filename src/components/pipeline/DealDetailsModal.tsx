@@ -24,6 +24,7 @@ import ProposalUploader from '@/components/pipeline/ProposalUploader'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { Badge } from '@/components/ui/badge'
 import { getDealIcon } from './DealIcon'
+import NotesList from '@/components/notes/NotesList'
 
 const STAGE_BADGE_VARIANTS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
     Opportunity: 'muted',
@@ -39,7 +40,7 @@ function formatCurrency(value: number) {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
 }
 
-type Tab = 'proposals' | 'activity'
+type Tab = 'proposals' | 'notes' | 'activity'
 
 interface DealDetailsModalProps {
     dealId: string
@@ -325,7 +326,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
 
                         {/* Tabs */}
                         <div className="px-8 flex gap-1 border-b border-border/40">
-                            {(['proposals', 'activity'] as Tab[]).map((tab) => (
+                            {(['proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -336,7 +337,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                                             : 'text-muted-foreground hover:text-foreground',
                                     ].join(' ')}
                                 >
-                                    {tab === 'proposals' ? `Proposals${attachments.length > 0 ? ` (${attachments.length})` : ''}` : 'Activity'}
+                                    {tab === 'proposals' ? `Proposals${attachments.length > 0 ? ` (${attachments.length})` : ''}` : tab}
                                 </button>
                             ))}
                         </div>
@@ -354,6 +355,10 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                                 onDeleted={handleAttachmentDeleted}
                                 dealStage={deal.stage}
                             />
+                        )}
+
+                        {activeTab === 'notes' && dealId && orgId && (
+                            <NotesList entityType="deal" entityId={dealId} orgId={orgId} />
                         )}
 
                         {activeTab === 'activity' && (

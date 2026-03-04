@@ -8,6 +8,8 @@ import ClientsPage from './pages/app/clients/ClientsPage'
 import ClientDetailPage from './pages/app/clients/ClientDetailPage'
 import PipelinePage from './pages/app/pipeline/PipelinePage'
 import DealDetailPage from './pages/app/pipeline/DealDetailPage'
+import NotesPage from './pages/app/notes/NotesPage'
+import NoteDetailPage from './pages/app/notes/NoteDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="clients/:clientId" element={<ClientDetailPage />} />
         <Route path="pipeline" element={<PipelinePage />} />
         <Route path="deals/:dealId" element={<DealDetailPage />} />
+        <Route path="notes" element={<NotesPage />} />
+        <Route path="notes/:noteId" element={<NoteDetailPage />} />
       </Route>
 
       {/* Catch-all */}

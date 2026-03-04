@@ -48,6 +48,16 @@ const EVENT_CONFIG: Record<
         label: 'Note added',
         color: 'text-amber-600 bg-amber-50',
     },
+    note_linked: {
+        icon: <StickyNote size={14} />,
+        label: 'Note linked',
+        color: 'text-amber-600 bg-amber-50',
+    },
+    note_edited: {
+        icon: <StickyNote size={14} />,
+        label: 'Note edited',
+        color: 'text-amber-600 bg-amber-50',
+    },
     task_created: {
         icon: <CheckSquare size={14} />,
         label: 'Task created',
@@ -70,7 +80,7 @@ function getEventConfig(eventType: string) {
     )
 }
 
-function getEventDescription(activity: ActivityRecord): string {
+function getEventDescription(activity: ActivityRecord): React.ReactNode {
     const d = activity.data
 
     switch (activity.event_type) {
@@ -79,6 +89,18 @@ function getEventDescription(activity: ActivityRecord): string {
         case 'proposal_uploaded':
             return `"${d.file_name as string}"`
         case 'note_created':
+        case 'note_linked':
+        case 'note_edited':
+            if (d.note_id) {
+                return (
+                    <Link
+                        to={`/app/notes/${d.note_id as string}`}
+                        className="font-medium text-accent hover:underline"
+                    >
+                        {(d.title as string) ?? 'Note'}
+                    </Link>
+                )
+            }
             return (d.title as string) ?? 'Note'
         case 'task_created':
             return (d.title as string) ?? 'Task'

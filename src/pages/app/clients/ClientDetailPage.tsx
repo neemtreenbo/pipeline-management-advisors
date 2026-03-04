@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getDealIcon } from '@/components/pipeline/DealIcon'
 import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
+import NotesList from '@/components/notes/NotesList'
 
 interface Client {
     id: string
@@ -114,19 +115,34 @@ export default function ClientDetailPage() {
                 setDeals(clientDeals)
                 const dealIds = clientDeals.map(d => d.id)
 
-                // Build OR filter: client activities + deal activities for this client
+                // Fetch linked notes to this client OR deals
+                let orLinkQuery = `and(to_type.eq.client,to_id.eq.${data.id})`
+                if (dealIds.length > 0) {
+                    orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
+                }
+                const { data: links } = await supabase
+                    .from('links')
+                    .select('from_id')
+                    .eq('from_type', 'note')
+                    .or(orLinkQuery)
+
+                const noteIds = Array.from(new Set(links?.map(l => l.from_id) || []))
+
+                // Build OR filter: client activities + deal activities + note activities
                 let query = supabase
                     .from('activities')
                     .select('*')
                     .order('created_at', { ascending: false })
 
+                const chunks = [`and(entity_type.eq.client,entity_id.eq.${data.id})`]
                 if (dealIds.length > 0) {
-                    query = query.or(
-                        `and(entity_type.eq.client,entity_id.eq.${data.id}),and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`
-                    )
-                } else {
-                    query = query.eq('entity_type', 'client').eq('entity_id', data.id)
+                    chunks.push(`and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`)
                 }
+                if (noteIds.length > 0) {
+                    chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
+                }
+
+                query = query.or(chunks.join(','))
 
                 const { data: acts } = await query
                 setActivities(acts ?? [])
@@ -450,9 +466,9 @@ export default function ClientDetailPage() {
                         <EmptySection icon={CheckSquare} label="tasks" />
                     </TabsContent>
 
-                    {/* Notes (placeholder) */}
+                    {/* Notes */}
                     <TabsContent value="notes">
-                        <EmptySection icon={FileText} label="notes" />
+                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} />}
                     </TabsContent>
 
                     {/* Activity */}
