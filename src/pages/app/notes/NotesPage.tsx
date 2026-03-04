@@ -163,19 +163,21 @@ export default function NotesPage() {
     return (
         <div className="flex flex-col h-full bg-background">
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-white sticky top-0 z-10 shrink-0">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes</h1>
-                    <p className="text-sm text-muted-foreground">Workspace knowledge and records</p>
+            <header className="border-b border-border bg-white sticky top-0 z-10 shrink-0 w-full">
+                <div className="flex items-center justify-between max-w-5xl mx-auto px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes</h1>
+                        <p className="text-sm text-muted-foreground">Workspace knowledge and records</p>
+                    </div>
+                    <Button onClick={handleCreateNote}>
+                        <Plus size={16} />
+                        New Note
+                    </Button>
                 </div>
-                <Button onClick={handleCreateNote}>
-                    <Plus size={16} />
-                    New Note
-                </Button>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6 pb-20">
-                <div className="max-w-5xl mx-auto flex flex-col gap-6">
+            <div className="flex-1 overflow-y-auto py-8 pb-20">
+                <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
 
                     {/* Toolbar */}
                     <div className="flex items-center gap-4">

@@ -257,7 +257,7 @@ export default function ClientsPage() {
         <div className="min-h-screen bg-background">
             {/* Header */}
             <div className="border-b border-border bg-white sticky top-0 z-10">
-                <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl font-semibold text-foreground">Clients</h1>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -293,7 +293,7 @@ export default function ClientsPage() {
             </div>
 
             {/* Table */}
-            <div className="max-w-screen-xl mx-auto px-6 py-6">
+            <div className="max-w-5xl mx-auto px-6 py-8">
                 {loading ? (
                     <div className="flex flex-col gap-2">
                         {[...Array(8)].map((_, i) => (

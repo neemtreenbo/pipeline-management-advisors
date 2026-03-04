@@ -226,8 +226,8 @@ export default function PipelinePage() {
     return (
         <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
-            <div className="border-b border-border bg-white sticky top-0 z-10">
-                <div className="px-6 py-4 flex items-center justify-between">
+            <div className="border-b border-border bg-white sticky top-0 z-10 w-full">
+                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <LayoutGrid size={20} className="text-muted-foreground" />
                         <div>
@@ -252,7 +252,7 @@ export default function PipelinePage() {
 
             {/* Kanban Board */}
             {loading ? (
-                <div className="flex gap-4 px-6 py-6 overflow-x-auto">
+                <div className="flex gap-4 px-6 py-8 overflow-x-auto w-full h-full">
                     {PIPELINE_STAGES.map((stage) => (
                         <div
                             key={stage}
@@ -262,7 +262,7 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <DragDropContext onDragEnd={handleDragEnd}>
-                    <div className="flex gap-4 px-6 py-6 overflow-x-auto flex-1 items-start">
+                    <div className="flex gap-4 px-6 py-8 overflow-x-auto flex-1 items-start w-full">
                         {PIPELINE_STAGES.map((stage) => (
                             <KanbanColumn
                                 key={stage}
