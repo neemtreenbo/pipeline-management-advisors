@@ -68,7 +68,7 @@ export default function ClientsPage() {
             .eq('user_id', user!.id)
             .eq('status', 'active')
             .limit(1)
-            .single()
+            .maybeSingle()
 
         if (!membership) { setLoading(false); return }
         setOrgId(membership.org_id)
