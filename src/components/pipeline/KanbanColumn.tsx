@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { Droppable } from '@hello-pangea/dnd'
 import type { Deal, DealStage } from '@/lib/deals'
 
 import DealCard from './DealCard'
@@ -11,11 +12,7 @@ interface KanbanColumnProps {
     stage: DealStage
     deals: Deal[]
     attachmentCounts: AttachmentCounts
-    onDragStart: (e: React.DragEvent, dealId: string, fromStage: DealStage) => void
-    onDragOver: (e: React.DragEvent) => void
-    onDrop: (e: React.DragEvent, toStage: DealStage) => void
     onAddDeal: (stage: DealStage) => void
-    draggingDealId: string | null
 }
 
 const STAGE_COLORS: Record<string, string> = {
@@ -32,19 +29,13 @@ export default function KanbanColumn({
     stage,
     deals,
     attachmentCounts,
-    onDragStart,
-    onDragOver,
-    onDrop,
     onAddDeal,
-    draggingDealId,
 }: KanbanColumnProps) {
     const colorClass = STAGE_COLORS[stage] ?? 'bg-muted text-muted-foreground'
 
     return (
         <div
             className="flex flex-col bg-muted/40 rounded-xl p-3 min-w-[240px] w-64 shrink-0"
-            onDragOver={onDragOver}
-            onDrop={(e) => onDrop(e, stage)}
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
             {/* Column header */}
@@ -68,27 +59,36 @@ export default function KanbanColumn({
             </div>
 
             {/* Deal cards */}
-            <div className="flex flex-col gap-2 flex-1 min-h-[120px]">
-                {deals.map((deal) => {
-                    const counts = attachmentCounts[deal.id] ?? { proposal: 0, total: 0 }
-                    return (
-                        <DealCard
-                            key={deal.id}
-                            deal={deal}
-                            proposalCount={counts.proposal}
-                            attachmentCount={counts.total}
-                            isDragging={draggingDealId === deal.id}
-                            onDragStart={onDragStart}
-                        />
-                    )
-                })}
+            <Droppable droppableId={stage}>
+                {(provided, snapshot) => (
+                    <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex flex-col gap-2 flex-1 min-h-[120px] rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
+                            }`}
+                    >
+                        {deals.map((deal, index) => {
+                            const counts = attachmentCounts[deal.id] ?? { proposal: 0, total: 0 }
+                            return (
+                                <DealCard
+                                    key={deal.id}
+                                    deal={deal}
+                                    index={index}
+                                    proposalCount={counts.proposal}
+                                    attachmentCount={counts.total}
+                                />
+                            )
+                        })}
+                        {provided.placeholder}
 
-                {deals.length === 0 && (
-                    <div className="flex-1 flex items-center justify-center text-[11px] text-muted-foreground border-2 border-dashed border-border rounded-lg py-6">
-                        Drop here
+                        {deals.length === 0 && !snapshot.isDraggingOver && (
+                            <div className="flex-1 flex items-center justify-center text-[11px] text-muted-foreground border-2 border-dashed border-border/50 rounded-lg py-6 my-1">
+                                Drop here
+                            </div>
+                        )}
                     </div>
                 )}
-            </div>
+            </Droppable>
         </div>
     )
 }

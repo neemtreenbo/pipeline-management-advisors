@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, LayoutGrid } from 'lucide-react'
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -28,8 +29,6 @@ export default function PipelinePage() {
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
-
-    const [draggingDeal, setDraggingDeal] = useState<{ id: string; fromStage: DealStage } | null>(null)
 
     // Fetch org membership once
     useEffect(() => {
@@ -84,46 +83,120 @@ export default function PipelinePage() {
         (acc, stage) => ({ ...acc, [stage]: [] }),
         {} as Record<DealStage, Deal[]>
     )
-    deals.forEach((deal) => {
+
+    // Make sure to order deals within columns for consistent rendering, matching the db index
+    deals.sort((a, b) => {
+        if (a.order_index === b.order_index) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        }
+        return (a.order_index ?? 0) - (b.order_index ?? 0)
+    }).forEach((deal) => {
         if (dealsByStage[deal.stage]) {
             dealsByStage[deal.stage].push(deal)
         }
     })
 
-    // Drag
-    function handleDragStart(e: React.DragEvent, dealId: string, fromStage: DealStage) {
-        setDraggingDeal({ id: dealId, fromStage })
-        e.dataTransfer.effectAllowed = 'move'
-    }
+    // Drag and Drop using @hello-pangea/dnd
+    async function handleDragEnd(result: DropResult) {
+        const { source, destination, draggableId } = result
 
-    function handleDragOver(e: React.DragEvent) {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-    }
+        // Dropped outside a valid column
+        if (!destination) return
 
-    async function handleDrop(e: React.DragEvent, toStage: DealStage) {
-        e.preventDefault()
-        if (!draggingDeal || !user || !orgId) return
-        const { id: dealId, fromStage } = draggingDeal
-        setDraggingDeal(null)
-        if (fromStage === toStage) return
+        // Dropped in the same spot
+        if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
-        // Optimistic update
-        setDeals((prev) =>
-            prev.map((d) => (d.id === dealId ? { ...d, stage: toStage } : d))
-        )
+        const fromStage = source.droppableId as DealStage
+        const toStage = destination.droppableId as DealStage
+
+        const dealToMove = deals.find(d => d.id === draggableId)
+        if (!dealToMove || !user || !orgId) return
+
+        // Create a copy of deals for optimistic update
+        const updatedDeals = [...deals]
+
+        // We'll calculate the new order_index
+        let newOrderIndex = dealToMove.order_index || 0
+
+        // Find the specific column's deals
+        const destDeals = dealsByStage[toStage]
+
+        // 1. If moving within the SAME column
+        if (fromStage === toStage) {
+            // Remove from old pos, insert to new pos (optimistic array move)
+            const columnDeals = [...destDeals]
+            columnDeals.splice(source.index, 1)
+            columnDeals.splice(destination.index, 0, dealToMove)
+
+            // Calculate new position using surrounding items
+            if (columnDeals.length === 1) {
+                // It's the only one (edge case, usually impossible within same col)
+                newOrderIndex = Date.now() / 1000
+            } else if (destination.index === 0) {
+                // Moved to top
+                const nextItem = columnDeals[1] // it's at index 0 now
+                newOrderIndex = (nextItem?.order_index ?? Date.now() / 1000) - 1000
+            } else if (destination.index === columnDeals.length - 1) {
+                // Moved to bottom
+                const prevItem = columnDeals[columnDeals.length - 2]
+                newOrderIndex = (prevItem?.order_index ?? Date.now() / 1000) + 1000
+            } else {
+                // Sandwiched between two items
+                const prevItem = columnDeals[destination.index - 1]
+                const nextItem = columnDeals[destination.index + 1]
+                const prevOrd = prevItem?.order_index ?? 0
+                const nextOrd = nextItem?.order_index ?? (prevOrd + 2000)
+                newOrderIndex = (prevOrd + nextOrd) / 2.0
+            }
+        } else {
+            // 2. Moving to a DIFFERENT column
+            const destDealsCopy = [...destDeals]
+            destDealsCopy.splice(destination.index, 0, dealToMove)
+
+            if (destDealsCopy.length === 1) {
+                // Only item in new col
+                newOrderIndex = Date.now() / 1000
+            } else if (destination.index === 0) {
+                // Moved to top of new col
+                const nextItem = destDealsCopy[1]
+                newOrderIndex = (nextItem?.order_index ?? Date.now() / 1000) - 1000
+            } else if (destination.index === destDealsCopy.length - 1) {
+                // Moved to bottom of new col
+                const prevItem = destDealsCopy[destDealsCopy.length - 2]
+                newOrderIndex = (prevItem?.order_index ?? Date.now() / 1000) + 1000
+            } else {
+                // Sandwiched in new col
+                const prevItem = destDealsCopy[destination.index - 1]
+                const nextItem = destDealsCopy[destination.index + 1]
+                const prevOrd = prevItem?.order_index ?? 0
+                const nextOrd = nextItem?.order_index ?? (prevOrd + 2000)
+                newOrderIndex = (prevOrd + nextOrd) / 2.0
+            }
+        }
+
+        // Optimistically apply visual changes immediately
+        const targetDealIdx = updatedDeals.findIndex(d => d.id === dealToMove.id)
+        if (targetDealIdx !== -1) {
+            updatedDeals[targetDealIdx] = {
+                ...dealToMove,
+                stage: toStage,
+                order_index: newOrderIndex
+            }
+            setDeals(updatedDeals)
+        }
 
         try {
-            await updateDealStage(dealId, toStage)
-            await logDealActivity(orgId, user.id, dealId, 'deal_stage_changed', {
-                from_stage: fromStage,
-                to_stage: toStage,
-            })
-        } catch {
-            // Revert on failure
-            setDeals((prev) =>
-                prev.map((d) => (d.id === dealId ? { ...d, stage: fromStage } : d))
-            )
+            await updateDealStage(dealToMove.id, toStage, newOrderIndex)
+            if (fromStage !== toStage) {
+                await logDealActivity(orgId, user.id, dealToMove.id, 'deal_stage_changed', {
+                    from_stage: fromStage,
+                    to_stage: toStage,
+                })
+            }
+        } catch (err: unknown) {
+            console.error('Failed to update stage/position', err)
+            // Revert state if the API fails
+            setDeals(deals)
         }
     }
 
@@ -188,21 +261,19 @@ export default function PipelinePage() {
                     ))}
                 </div>
             ) : (
-                <div className="flex gap-4 px-6 py-6 overflow-x-auto flex-1 items-start">
-                    {PIPELINE_STAGES.map((stage) => (
-                        <KanbanColumn
-                            key={stage}
-                            stage={stage}
-                            deals={dealsByStage[stage]}
-                            attachmentCounts={attachmentCounts}
-                            onDragStart={handleDragStart}
-                            onDragOver={handleDragOver}
-                            onDrop={handleDrop}
-                            onAddDeal={handleOpenNewDeal}
-                            draggingDealId={draggingDeal?.id ?? null}
-                        />
-                    ))}
-                </div>
+                <DragDropContext onDragEnd={handleDragEnd}>
+                    <div className="flex gap-4 px-6 py-6 overflow-x-auto flex-1 items-start">
+                        {PIPELINE_STAGES.map((stage) => (
+                            <KanbanColumn
+                                key={stage}
+                                stage={stage}
+                                deals={dealsByStage[stage]}
+                                attachmentCounts={attachmentCounts}
+                                onAddDeal={handleOpenNewDeal}
+                            />
+                        ))}
+                    </div>
+                </DragDropContext>
             )}
 
             {/* New Deal Modal */}

@@ -26,6 +26,7 @@ export interface Deal {
     owner_id: string
     stage: DealStage
     value: number
+    order_index?: number
     expected_close_date: string | null
     data: Record<string, unknown>
     created_at: string
@@ -55,6 +56,7 @@ export async function fetchDealsByOrg(orgId: string): Promise<Deal[]> {
       client:clients(id, name, email)
     `)
         .eq('org_id', orgId)
+        .order('order_index', { ascending: true })
         .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -96,11 +98,16 @@ export async function createDeal(input: NewDealInput): Promise<Deal> {
     return data as Deal
 }
 
-/** Update the stage of a deal */
-export async function updateDealStage(dealId: string, stage: DealStage): Promise<void> {
+/** Update the stage and optionally the order_index of a deal */
+export async function updateDealStage(dealId: string, stage: DealStage, orderIndex?: number): Promise<void> {
+    const updateData: any = { stage }
+    if (orderIndex !== undefined) {
+        updateData.order_index = orderIndex
+    }
+
     const { error } = await supabase
         .from('deals')
-        .update({ stage })
+        .update(updateData)
         .eq('id', dealId)
 
     if (error) throw error
