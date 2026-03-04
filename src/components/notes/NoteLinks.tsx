@@ -6,6 +6,7 @@ import { getEntitiesLinkedToNote, unlinkNoteFromEntity, linkNoteToEntity } from 
 import type { NoteLink } from '@/lib/notes'
 import AddLinkModal from './AddLinkModal'
 import { useAuth } from '@/contexts/AuthContext'
+import ClientSelector from '@/components/ui/ClientSelector'
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
     client: User,
@@ -33,6 +34,7 @@ export default function NoteLinks({ noteId, orgId, onLinksChanged }: NoteLinksPr
     const [links, setLinks] = useState<LinkedEntity[]>([])
     const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false)
 
     async function fetchLinks() {
         setLoading(true)
@@ -111,6 +113,12 @@ export default function NoteLinks({ noteId, orgId, onLinksChanged }: NoteLinksPr
         if (onLinksChanged) onLinksChanged()
     }
 
+    async function handleLinkClient(clientId: string) {
+        if (!clientId) return
+        await handleLinkSelected('client', clientId)
+        setIsClientSelectorOpen(false)
+    }
+
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -118,16 +126,43 @@ export default function NoteLinks({ noteId, orgId, onLinksChanged }: NoteLinksPr
                     <LinkIcon size={12} />
                     Linked To
                 </h4>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    <Plus size={12} />
-                    <span>Add Link</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsClientSelectorOpen(prev => !prev)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        title="Link Client"
+                    >
+                        <User size={12} />
+                        <span>Client</span>
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        title="Link Other"
+                    >
+                        <Plus size={12} />
+                        <span>Other</span>
+                    </button>
+                </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            {isClientSelectorOpen && (
+                <div className="p-3 bg-muted/20 border border-border rounded-xl mt-1 relative animate-in fade-in slide-in-from-top-1">
+                    <button className="absolute top-3 right-3 text-muted-foreground hover:text-foreground z-10" onClick={() => setIsClientSelectorOpen(false)}>
+                        <X size={14} />
+                    </button>
+                    <div className="pr-6">
+                        <label className="text-xs font-medium text-foreground/80 mb-2 block">Link Client</label>
+                        <ClientSelector
+                            orgId={orgId}
+                            value=""
+                            onChange={handleLinkClient}
+                        />
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 mt-1">
                 {links.length === 0 && !loading && (
                     <span className="text-xs text-muted-foreground/60 italic">No links attached</span>
                 )}
