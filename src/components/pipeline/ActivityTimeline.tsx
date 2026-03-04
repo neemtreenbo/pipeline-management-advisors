@@ -68,6 +68,11 @@ const EVENT_CONFIG: Record<
         label: 'Task completed',
         color: 'text-green-600 bg-green-50',
     },
+    task_uncompleted: {
+        icon: <CheckSquare size={14} />,
+        label: 'Task reopened',
+        color: 'text-amber-600 bg-amber-50',
+    },
 }
 
 function getEventConfig(eventType: string) {
@@ -105,7 +110,8 @@ function getEventDescription(activity: ActivityRecord): React.ReactNode {
         case 'task_created':
             return (d.title as string) ?? 'Task'
         case 'task_completed':
-            return (d.title as string) ?? 'Task completed'
+        case 'task_uncompleted':
+            return (d.title as string) ?? 'Task'
         default:
             return ''
     }

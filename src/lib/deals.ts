@@ -167,12 +167,13 @@ export async function logDealActivity(
 export async function fetchDealActivities(dealId: string) {
     const { data: links } = await supabase
         .from('links')
-        .select('from_id')
-        .eq('from_type', 'note')
+        .select('from_id, from_type')
+        .in('from_type', ['note', 'task'])
         .eq('to_type', 'deal')
         .eq('to_id', dealId)
 
-    const noteIds = Array.from(new Set(links?.map(l => l.from_id) || []))
+    const noteIds = Array.from(new Set(links?.filter(l => l.from_type === 'note').map(l => l.from_id) || []))
+    const taskIds = Array.from(new Set(links?.filter(l => l.from_type === 'task').map(l => l.from_id) || []))
 
     let query = supabase
         .from('activities')
@@ -182,6 +183,9 @@ export async function fetchDealActivities(dealId: string) {
     const chunks = [`and(entity_type.eq.deal,entity_id.eq.${dealId})`]
     if (noteIds.length > 0) {
         chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
+    }
+    if (taskIds.length > 0) {
+        chunks.push(`and(entity_type.eq.task,entity_id.in.(${taskIds.join(',')}))`)
     }
     query = query.or(chunks.join(','))
 

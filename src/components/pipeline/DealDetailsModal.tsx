@@ -25,6 +25,7 @@ import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { Badge } from '@/components/ui/badge'
 import { getDealIcon } from './DealIcon'
 import NotesList from '@/components/notes/NotesList'
+import EntityTasks from '@/components/tasks/EntityTasks'
 
 const STAGE_BADGE_VARIANTS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
     Opportunity: 'muted',
@@ -40,7 +41,7 @@ function formatCurrency(value: number) {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
 }
 
-type Tab = 'proposals' | 'notes' | 'activity'
+type Tab = 'tasks' | 'proposals' | 'notes' | 'activity'
 
 interface DealDetailsModalProps {
     dealId: string
@@ -57,7 +58,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
     }>>([])
     const [orgId, setOrgId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<Tab>('proposals')
+    const [activeTab, setActiveTab] = useState<Tab>('tasks')
     const [editingStage, setEditingStage] = useState(false)
     const [editingValue, setEditingValue] = useState(false)
     const [valueDraft, setValueDraft] = useState('')
@@ -326,7 +327,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
 
                         {/* Tabs */}
                         <div className="px-8 flex gap-1 border-b border-border/40">
-                            {(['proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
+                            {(['tasks', 'proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -345,6 +346,10 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
 
                     {/* Scrollable Tab content */}
                     <div className="overflow-y-auto px-8 py-6 bg-muted/10 flex-1">
+                        {activeTab === 'tasks' && dealId && orgId && (
+                            <EntityTasks dealId={dealId} orgId={orgId} />
+                        )}
+
                         {activeTab === 'proposals' && orgId && user && (
                             <ProposalUploader
                                 dealId={deal.id}
