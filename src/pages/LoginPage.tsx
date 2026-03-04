@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
     const navigate = useNavigate()
@@ -24,18 +27,22 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <div className="auth-logo">📊</div>
-                <h1 className="auth-title">Welcome back</h1>
-                <p className="auth-subtitle">Sign in to your CRM</p>
+        <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+            <div className="w-full max-w-[380px]">
+                <div className="text-2xl mb-6">📊</div>
+                <h1 className="text-2xl font-semibold text-foreground mb-1">Welcome back</h1>
+                <p className="text-sm text-muted-foreground mb-8">Sign in to your CRM</p>
 
-                <form onSubmit={handleSubmit} className="auth-form">
-                    {error && <div className="auth-error">{error}</div>}
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {error && (
+                        <div className="text-sm text-destructive bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                            {error}
+                        </div>
+                    )}
 
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <input
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
                             id="email"
                             type="email"
                             placeholder="you@example.com"
@@ -45,9 +52,9 @@ export default function LoginPage() {
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="password">Password</label>
-                        <input
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
                             id="password"
                             type="password"
                             placeholder="••••••••"
@@ -57,17 +64,22 @@ export default function LoginPage() {
                         />
                     </div>
 
-                    <div className="auth-form-footer">
-                        <Link to="/forgot-password" className="auth-link">Forgot password?</Link>
+                    <div className="flex justify-end">
+                        <Link to="/forgot-password" className="text-sm text-accent hover:underline">
+                            Forgot password?
+                        </Link>
                     </div>
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+                    <Button type="submit" className="w-full" disabled={loading} id="login-submit">
                         {loading ? 'Signing in…' : 'Sign In'}
-                    </button>
+                    </Button>
                 </form>
 
-                <p className="auth-switch">
-                    Don't have an account? <Link to="/signup" className="auth-link">Sign up</Link>
+                <p className="mt-6 text-center text-sm text-muted-foreground">
+                    Don't have an account?{' '}
+                    <Link to="/signup" className="text-accent hover:underline font-medium">
+                        Sign up
+                    </Link>
                 </p>
             </div>
         </div>

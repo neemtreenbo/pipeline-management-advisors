@@ -4,6 +4,8 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HomePage from './pages/app/HomePage'
+import ClientsPage from './pages/app/clients/ClientsPage'
+import ClientDetailPage from './pages/app/clients/ClientDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -13,6 +15,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+      {/* App routes */}
       <Route
         path="/app/home"
         element={
@@ -21,6 +25,23 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/app/clients"
+        element={
+          <ProtectedRoute>
+            <ClientsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/clients/:clientId"
+        element={
+          <ProtectedRoute>
+            <ClientDetailPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

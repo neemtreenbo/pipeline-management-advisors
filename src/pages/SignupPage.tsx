@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function SignupPage() {
     const [fullName, setFullName] = useState('')
@@ -30,35 +33,39 @@ export default function SignupPage() {
 
     if (success) {
         return (
-            <div className="auth-page">
-                <div className="auth-card">
-                    <div className="auth-logo">✉️</div>
-                    <h1 className="auth-title">Check your email</h1>
-                    <p className="auth-subtitle">
-                        We sent a confirmation link to <strong>{email}</strong>.<br />
+            <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+                <div className="w-full max-w-[380px] text-center">
+                    <div className="text-2xl mb-6">✉️</div>
+                    <h1 className="text-2xl font-semibold text-foreground mb-2">Check your email</h1>
+                    <p className="text-sm text-muted-foreground mb-8">
+                        We sent a confirmation link to <strong className="text-foreground">{email}</strong>.<br />
                         Click it to activate your account.
                     </p>
-                    <Link to="/login" className="btn btn-primary btn-full" style={{ marginTop: '1.5rem' }}>
-                        Back to Sign In
-                    </Link>
+                    <Button asChild className="w-full">
+                        <Link to="/login">Back to Sign In</Link>
+                    </Button>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <div className="auth-logo">📊</div>
-                <h1 className="auth-title">Create your account</h1>
-                <p className="auth-subtitle">Start managing your pipeline today</p>
+        <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+            <div className="w-full max-w-[380px]">
+                <div className="text-2xl mb-6">📊</div>
+                <h1 className="text-2xl font-semibold text-foreground mb-1">Create your account</h1>
+                <p className="text-sm text-muted-foreground mb-8">Start managing your pipeline today</p>
 
-                <form onSubmit={handleSubmit} className="auth-form">
-                    {error && <div className="auth-error">{error}</div>}
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {error && (
+                        <div className="text-sm text-destructive bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                            {error}
+                        </div>
+                    )}
 
-                    <div className="form-group">
-                        <label htmlFor="fullName">Full Name</label>
-                        <input
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input
                             id="fullName"
                             type="text"
                             placeholder="Juan dela Cruz"
@@ -68,9 +75,9 @@ export default function SignupPage() {
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <input
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
                             id="email"
                             type="email"
                             placeholder="you@example.com"
@@ -80,9 +87,9 @@ export default function SignupPage() {
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="password">Password</label>
-                        <input
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
                             id="password"
                             type="password"
                             placeholder="At least 6 characters"
@@ -93,13 +100,16 @@ export default function SignupPage() {
                         />
                     </div>
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+                    <Button type="submit" className="w-full" disabled={loading} id="signup-submit">
                         {loading ? 'Creating account…' : 'Create Account'}
-                    </button>
+                    </Button>
                 </form>
 
-                <p className="auth-switch">
-                    Already have an account? <Link to="/login" className="auth-link">Sign in</Link>
+                <p className="mt-6 text-center text-sm text-muted-foreground">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-accent hover:underline font-medium">
+                        Sign in
+                    </Link>
                 </p>
             </div>
         </div>
