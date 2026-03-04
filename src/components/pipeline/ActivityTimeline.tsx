@@ -6,11 +6,14 @@ import {
     Star,
     Activity,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 
 interface ActivityRecord {
     id: string
     event_type: string
+    entity_type?: string
+    entity_id?: string
     data: Record<string, unknown>
     created_at: string
     actor_id: string
@@ -18,6 +21,7 @@ interface ActivityRecord {
 
 interface ActivityTimelineProps {
     activities: ActivityRecord[]
+    contextDeals?: { id: string; name: string }[]
 }
 
 const EVENT_CONFIG: Record<
@@ -101,7 +105,7 @@ function timeAgo(dateStr: string): string {
     return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
 
-export default function ActivityTimeline({ activities }: ActivityTimelineProps) {
+export default function ActivityTimeline({ activities, contextDeals }: ActivityTimelineProps) {
     if (activities.length === 0) {
         return (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
@@ -143,6 +147,16 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
                                         <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">
                                             {description}
                                         </p>
+                                    )}
+                                    {activity.entity_type === 'deal' && contextDeals && contextDeals.find(d => d.id === activity.entity_id) && (
+                                        <div className="mt-1">
+                                            <Link
+                                                to={`/app/deals/${activity.entity_id}`}
+                                                className="text-[11px] font-medium text-accent hover:underline flex items-center"
+                                            >
+                                                → {contextDeals.find(d => d.id === activity.entity_id)?.name}
+                                            </Link>
+                                        </div>
                                     )}
                                 </div>
                                 <span className="text-xs text-muted-foreground shrink-0 mt-0.5">

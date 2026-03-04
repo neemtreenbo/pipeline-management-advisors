@@ -19,13 +19,13 @@ interface KanbanColumnProps {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-    Prospect: 'bg-zinc-100 text-zinc-600',
+    Opportunity: 'bg-zinc-100 text-zinc-600',
     Contacted: 'bg-blue-50 text-blue-600',
-    'Fact Find': 'bg-purple-50 text-purple-600',
-    'Proposal Sent': 'bg-amber-50 text-amber-600',
-    Underwriting: 'bg-orange-50 text-orange-600',
-    Issued: 'bg-green-50 text-green-700',
-    Lost: 'bg-red-50 text-red-600',
+    Engaged: 'bg-purple-50 text-purple-600',
+    'Schedule To Present': 'bg-amber-50 text-amber-600',
+    'Proposal Presented': 'bg-orange-50 text-orange-600',
+    'Decision Pending': 'bg-yellow-50 text-yellow-700',
+    Closed: 'bg-green-50 text-green-700',
 }
 
 export default function KanbanColumn({

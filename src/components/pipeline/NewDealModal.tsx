@@ -21,7 +21,8 @@ interface NewDealModalProps {
     onCreated: (input: NewDealInput) => void
 }
 
-export default function NewDealModal({ orgId, defaultStage = 'Prospect', onClose, onCreated }: NewDealModalProps) {
+export default function NewDealModal({ orgId, defaultStage = 'Opportunity', onClose, onCreated }: NewDealModalProps) {
+
     const { user } = useAuth()
 
     const [clients, setClients] = useState<Client[]>([])

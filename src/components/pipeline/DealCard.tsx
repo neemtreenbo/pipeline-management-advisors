@@ -11,7 +11,7 @@ interface DealCardProps {
     onDragStart: (e: React.DragEvent, dealId: string, fromStage: DealStage) => void
 }
 
-const STAGES_NEEDING_PROPOSAL: DealStage[] = ['Proposal Sent', 'Underwriting', 'Issued']
+const STAGES_NEEDING_PROPOSAL: DealStage[] = ['Proposal Presented', 'Decision Pending']
 
 function formatCurrency(value: number) {
     if (!value) return null

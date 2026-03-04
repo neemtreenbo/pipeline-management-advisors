@@ -1,22 +1,22 @@
 import { supabase } from './supabase'
 
 export type DealStage =
-    | 'Prospect'
+    | 'Opportunity'
     | 'Contacted'
-    | 'Fact Find'
-    | 'Proposal Sent'
-    | 'Underwriting'
-    | 'Issued'
-    | 'Lost'
+    | 'Engaged'
+    | 'Schedule To Present'
+    | 'Proposal Presented'
+    | 'Decision Pending'
+    | 'Closed'
 
 export const PIPELINE_STAGES: DealStage[] = [
-    'Prospect',
+    'Opportunity',
     'Contacted',
-    'Fact Find',
-    'Proposal Sent',
-    'Underwriting',
-    'Issued',
-    'Lost',
+    'Engaged',
+    'Schedule To Present',
+    'Proposal Presented',
+    'Decision Pending',
+    'Closed',
 ]
 
 export interface Deal {
@@ -84,7 +84,7 @@ export async function createDeal(input: NewDealInput): Promise<Deal> {
             org_id: input.org_id,
             client_id: input.client_id,
             owner_id: input.owner_id,
-            stage: input.stage ?? 'Prospect',
+            stage: input.stage ?? 'Opportunity',
             value: input.value ?? 0,
             expected_close_date: input.expected_close_date ?? null,
             data: input.title ? { title: input.title } : {},

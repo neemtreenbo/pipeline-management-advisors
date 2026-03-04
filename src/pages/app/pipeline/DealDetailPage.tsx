@@ -26,13 +26,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 const STAGE_BADGE_VARIANTS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
-    Prospect: 'muted',
+    Opportunity: 'muted',
     Contacted: 'accent',
-    'Fact Find': 'accent',
-    'Proposal Sent': 'warning',
-    Underwriting: 'warning',
-    Issued: 'success',
-    Lost: 'muted',
+    Engaged: 'accent',
+    'Schedule To Present': 'warning',
+    'Proposal Presented': 'warning',
+    'Decision Pending': 'warning',
+    Closed: 'success',
 }
 
 function formatCurrency(value: number) {

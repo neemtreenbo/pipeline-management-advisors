@@ -40,7 +40,7 @@ export default function ProposalUploader({
     const proposals = attachments.filter((a) => a.file_type === 'proposal')
     const supporting = attachments.filter((a) => a.file_type === 'supporting_document')
 
-    const stagesNeedingProposal = ['Proposal Sent', 'Underwriting', 'Issued']
+    const stagesNeedingProposal = ['Proposal Presented', 'Decision Pending']
     const isMissingProposal = stagesNeedingProposal.includes(dealStage) && proposals.length === 0
 
     async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

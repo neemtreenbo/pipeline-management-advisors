@@ -9,6 +9,7 @@ import ClientDetailPage from './pages/app/clients/ClientDetailPage'
 import PipelinePage from './pages/app/pipeline/PipelinePage'
 import DealDetailPage from './pages/app/pipeline/DealDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import AppLayout from './components/layout/AppLayout'
 
 export default function App() {
   return (
@@ -20,45 +21,19 @@ export default function App() {
 
       {/* App routes */}
       <Route
-        path="/app/home"
+        path="/app"
         element={
           <ProtectedRoute>
-            <HomePage />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/app/clients"
-        element={
-          <ProtectedRoute>
-            <ClientsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/app/clients/:clientId"
-        element={
-          <ProtectedRoute>
-            <ClientDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/app/pipeline"
-        element={
-          <ProtectedRoute>
-            <PipelinePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/app/deals/:dealId"
-        element={
-          <ProtectedRoute>
-            <DealDetailPage />
-          </ProtectedRoute>
-        }
-      />
+      >
+        <Route path="home" element={<HomePage />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="clients/:clientId" element={<ClientDetailPage />} />
+        <Route path="pipeline" element={<PipelinePage />} />
+        <Route path="deals/:dealId" element={<DealDetailPage />} />
+      </Route>
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />

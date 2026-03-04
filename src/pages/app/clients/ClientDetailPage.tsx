@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fetchDealsByClient } from '@/lib/deals'
+import type { Deal } from '@/lib/deals'
+import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -69,6 +72,10 @@ export default function ClientDetailPage() {
     const [client, setClient] = useState<Client | null>(null)
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
+    const [deals, setDeals] = useState<Deal[]>([])
+    const [activities, setActivities] = useState<Array<{
+        id: string; event_type: string; entity_type: string; entity_id: string; data: Record<string, unknown>; created_at: string; actor_id: string
+    }>>([])
 
     // Edit state
     const [editing, setEditing] = useState(false)
@@ -99,6 +106,28 @@ export default function ClientDetailPage() {
                 source: data.source ?? '',
                 tags: (data.tags ?? []).join(', '),
             })
+            // Fetch linked deals then use their IDs to load all related activities
+            fetchDealsByClient(data.id).then(async (clientDeals) => {
+                setDeals(clientDeals)
+                const dealIds = clientDeals.map(d => d.id)
+
+                // Build OR filter: client activities + deal activities for this client
+                let query = supabase
+                    .from('activities')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+
+                if (dealIds.length > 0) {
+                    query = query.or(
+                        `and(entity_type.eq.client,entity_id.eq.${data.id}),and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`
+                    )
+                } else {
+                    query = query.eq('entity_type', 'client').eq('entity_id', data.id)
+                }
+
+                const { data: acts } = await query
+                setActivities(acts ?? [])
+            }).catch(() => { setDeals([]); setActivities([]) })
         }
         setLoading(false)
     }
@@ -361,9 +390,44 @@ export default function ClientDetailPage() {
                         </div>
                     </TabsContent>
 
-                    {/* Deals (placeholder) */}
+                    {/* Deals */}
                     <TabsContent value="deals">
-                        <EmptySection icon={Briefcase} label="deals" />
+                        {deals.length === 0 ? (
+                            <EmptySection icon={Briefcase} label="deals" />
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {deals.map((deal) => {
+                                    const title = (deal.data as Record<string, string>)?.title || client?.name || '—'
+                                    const formattedValue = deal.value > 0
+                                        ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(deal.value)
+                                        : null
+                                    return (
+                                        <Link
+                                            key={deal.id}
+                                            to={`/app/deals/${deal.id}`}
+                                            className="flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-5 py-4 hover:border-zinc-300 hover:shadow-sm transition-all"
+                                            id={`deal-link-${deal.id}`}
+                                        >
+                                            <div className="flex flex-col gap-0.5 min-w-0">
+                                                <p className="text-sm font-semibold text-foreground truncate">{title}</p>
+                                                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                                    <span className="text-xs text-muted-foreground">{deal.stage}</span>
+                                                    {formattedValue && (
+                                                        <span className="text-xs font-medium text-foreground">{formattedValue}</span>
+                                                    )}
+                                                    {deal.expected_close_date && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </TabsContent>
 
                     {/* Tasks (placeholder) */}
@@ -376,9 +440,12 @@ export default function ClientDetailPage() {
                         <EmptySection icon={FileText} label="notes" />
                     </TabsContent>
 
-                    {/* Activity (placeholder) */}
+                    {/* Activity */}
                     <TabsContent value="activity">
-                        <EmptySection icon={Activity} label="activity" />
+                        <ActivityTimeline
+                            activities={activities}
+                            contextDeals={deals.map(d => ({ id: d.id, name: (d.data as Record<string, string>)?.title || client?.name || 'Deal' }))}
+                        />
                     </TabsContent>
                 </Tabs>
             </div>

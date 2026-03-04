@@ -27,7 +27,8 @@ export default function PipelinePage() {
     const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
-    const [newDealStage, setNewDealStage] = useState<DealStage>('Prospect')
+    const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
+
     const [draggingDeal, setDraggingDeal] = useState<{ id: string; fromStage: DealStage } | null>(null)
 
     // Fetch org membership once
@@ -167,7 +168,8 @@ export default function PipelinePage() {
                     </div>
                     <Button
                         id="new-deal-btn"
-                        onClick={() => handleOpenNewDeal('Prospect')}
+                        onClick={() => handleOpenNewDeal('Opportunity')}
+
                     >
                         <Plus size={16} />
                         New Deal
