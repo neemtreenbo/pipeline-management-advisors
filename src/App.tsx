@@ -6,6 +6,8 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HomePage from './pages/app/HomePage'
 import ClientsPage from './pages/app/clients/ClientsPage'
 import ClientDetailPage from './pages/app/clients/ClientDetailPage'
+import PipelinePage from './pages/app/pipeline/PipelinePage'
+import DealDetailPage from './pages/app/pipeline/DealDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -38,6 +40,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ClientDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/pipeline"
+        element={
+          <ProtectedRoute>
+            <PipelinePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/deals/:dealId"
+        element={
+          <ProtectedRoute>
+            <DealDetailPage />
           </ProtectedRoute>
         }
       />

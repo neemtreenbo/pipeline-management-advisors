@@ -1,0 +1,170 @@
+import { supabase } from './supabase'
+
+export type DealStage =
+    | 'Prospect'
+    | 'Contacted'
+    | 'Fact Find'
+    | 'Proposal Sent'
+    | 'Underwriting'
+    | 'Issued'
+    | 'Lost'
+
+export const PIPELINE_STAGES: DealStage[] = [
+    'Prospect',
+    'Contacted',
+    'Fact Find',
+    'Proposal Sent',
+    'Underwriting',
+    'Issued',
+    'Lost',
+]
+
+export interface Deal {
+    id: string
+    org_id: string
+    client_id: string
+    owner_id: string
+    stage: DealStage
+    value: number
+    expected_close_date: string | null
+    data: Record<string, unknown>
+    created_at: string
+    updated_at: string
+    // joined
+    client?: { id: string; name: string; email: string | null }
+    _proposal_count?: number
+    _attachment_count?: number
+}
+
+export interface NewDealInput {
+    org_id: string
+    client_id: string
+    owner_id: string
+    stage?: DealStage
+    value?: number
+    expected_close_date?: string | null
+    title?: string
+}
+
+/** Fetch all deals for an org with client info joined */
+export async function fetchDealsByOrg(orgId: string): Promise<Deal[]> {
+    const { data, error } = await supabase
+        .from('deals')
+        .select(`
+      *,
+      client:clients(id, name, email)
+    `)
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data ?? []) as Deal[]
+}
+
+/** Fetch a single deal by ID */
+export async function fetchDealById(dealId: string): Promise<Deal | null> {
+    const { data, error } = await supabase
+        .from('deals')
+        .select(`
+      *,
+      client:clients(id, name, email)
+    `)
+        .eq('id', dealId)
+        .maybeSingle()
+
+    if (error) throw error
+    return data as Deal | null
+}
+
+/** Create a new deal */
+export async function createDeal(input: NewDealInput): Promise<Deal> {
+    const { data, error } = await supabase
+        .from('deals')
+        .insert({
+            org_id: input.org_id,
+            client_id: input.client_id,
+            owner_id: input.owner_id,
+            stage: input.stage ?? 'Prospect',
+            value: input.value ?? 0,
+            expected_close_date: input.expected_close_date ?? null,
+            data: input.title ? { title: input.title } : {},
+        })
+        .select(`*, client:clients(id, name, email)`)
+        .single()
+
+    if (error) throw error
+    return data as Deal
+}
+
+/** Update the stage of a deal */
+export async function updateDealStage(dealId: string, stage: DealStage): Promise<void> {
+    const { error } = await supabase
+        .from('deals')
+        .update({ stage })
+        .eq('id', dealId)
+
+    if (error) throw error
+}
+
+/** Update deal info fields */
+export async function updateDeal(
+    dealId: string,
+    updates: Partial<Pick<Deal, 'value' | 'expected_close_date' | 'stage'>> & { title?: string }
+): Promise<void> {
+    const { title, ...rest } = updates
+    const patch: Record<string, unknown> = { ...rest }
+    if (title !== undefined) {
+        // read current data first
+        const { data: existing } = await supabase
+            .from('deals')
+            .select('data')
+            .eq('id', dealId)
+            .maybeSingle()
+        patch.data = { ...(existing?.data ?? {}), title }
+    }
+    const { error } = await supabase.from('deals').update(patch).eq('id', dealId)
+    if (error) throw error
+}
+
+/** Fetch all deals for a given client */
+export async function fetchDealsByClient(clientId: string): Promise<Deal[]> {
+    const { data, error } = await supabase
+        .from('deals')
+        .select(`*, client:clients(id, name, email)`)
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data ?? []) as Deal[]
+}
+
+/** Log an activity tied to a deal */
+export async function logDealActivity(
+    orgId: string,
+    actorId: string,
+    dealId: string,
+    eventType: string,
+    data: Record<string, unknown> = {}
+): Promise<void> {
+    await supabase.from('activities').insert({
+        org_id: orgId,
+        actor_id: actorId,
+        entity_type: 'deal',
+        entity_id: dealId,
+        event_type: eventType,
+        data,
+    })
+}
+
+/** Fetch all activity records for a deal */
+export async function fetchDealActivities(dealId: string) {
+    const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('entity_type', 'deal')
+        .eq('entity_id', dealId)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data ?? []
+}
