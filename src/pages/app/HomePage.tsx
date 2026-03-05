@@ -1,34 +1,24 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { Users, Briefcase, FileText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function HomePage() {
-    const { user, signOut } = useAuth()
+    const { user } = useAuth()
     const navigate = useNavigate()
 
-    const handleSignOut = async () => {
-        await signOut()
-        navigate('/login')
-    }
-
     return (
-        <div className="min-h-screen bg-background">
-            {/* Header */}
-            <div className="border-b border-border bg-white sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-foreground">Good day 👋</h1>
-                        <p className="text-sm text-muted-foreground mt-0.5">{user?.email}</p>
-                    </div>
-                    <Button variant="secondary" onClick={handleSignOut}>
-                        Sign Out
-                    </Button>
+        <div className="min-h-screen bg-transparent pt-4">
+            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-foreground">Good day 👋</h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">{user?.email}</p>
                 </div>
+                {/* SignOut is now in the nav avatar, but leaving here as a quick action if desired, 
+                    or we could just drop it. We'll drop it since it's redundant. */}
             </div>
 
-            <div className="max-w-5xl mx-auto px-6 py-8">
+            <div className="max-w-5xl mx-auto px-6 py-4">
                 {/* Quick navigate */}
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Jump to</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">

@@ -4,6 +4,7 @@ import { Home, LayoutGrid, CheckSquare, Users, StickyNote } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageActions } from '@/contexts/PageActionsContext'
 
 const NAV_ITEMS = [
     { path: '/app/home', icon: Home, label: 'Home' },
@@ -20,6 +21,7 @@ export default function DynamicIslandNav() {
     const location = useLocation()
     const navigate = useNavigate()
     const { user, signOut } = useAuth()
+    const { portalNode } = usePageActions()
 
     const [hoveredPath, setHoveredPath] = useState<string | null>(null)
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -45,6 +47,23 @@ export default function DynamicIslandNav() {
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 className="pointer-events-auto flex items-center bg-white/80 backdrop-blur-xl border border-white shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08)] rounded-full p-1.5 gap-1"
             >
+                {/* Render any injected page actions inline with the island */}
+                <AnimatePresence>
+                    {portalNode && (
+                        <motion.div
+                            initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, width: "auto", scale: 1 }}
+                            exit={{ opacity: 0, width: 0, scale: 0.8, filter: "blur(4px)" }}
+                            className="flex items-center overflow-hidden whitespace-nowrap"
+                        >
+                            <div className="pl-2 pr-1 h-full flex items-center">
+                                {portalNode}
+                            </div>
+                            <div className="w-[1px] h-6 bg-slate-200/80 mx-1 origin-center" />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* Logo / Avatar dropdown area */}
                 <DropdownMenu.Root>
                     <DropdownMenu.Trigger asChild>

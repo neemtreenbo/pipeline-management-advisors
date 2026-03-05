@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageActions } from '@/contexts/PageActionsContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +60,7 @@ function formatSource(src: string | null) {
 export default function ClientsPage() {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const { setPortalNode } = usePageActions()
 
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
@@ -108,6 +110,18 @@ export default function ClientsPage() {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchOrgAndClients()
     }, [user, fetchOrgAndClients])
+
+    // Inject the "Add Client" button into the Island navigation
+    useEffect(() => {
+        setPortalNode(
+            <Button onClick={() => setDrawerOpen(true)} id="nav-add-client-btn" className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
+                <Plus size={15} className="mr-1 sm:mr-1.5" />
+                <span className="hidden sm:inline">Add Client</span>
+                <span className="inline sm:hidden">Add</span>
+            </Button>
+        )
+        return () => setPortalNode(null)
+    }, [setPortalNode])
 
     useEffect(() => {
         if (inlineEdit) {
@@ -254,46 +268,37 @@ export default function ClientsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            {/* Header */}
-            <div className="border-b border-border bg-white sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-xl font-semibold text-foreground">Clients</h1>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                            {loading ? '...' : `${clients.length} ${clients.length === 1 ? 'client' : 'clients'}`}
-                        </p>
-                    </div>
+        <div className="min-h-screen bg-transparent pt-4">
+            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        {loading ? '...' : `${clients.length} ${clients.length === 1 ? 'client' : 'clients'}`}
+                    </p>
+                </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                id="client-search"
-                                placeholder="Search name, email, phone..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="pl-9 h-9 w-64 text-sm rounded-xl border-muted-foreground/10 bg-muted/30 shadow-none"
-                            />
-                            {search && (
-                                <button
-                                    onClick={() => setSearch('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                >
-                                    <X size={13} />
-                                </button>
-                            )}
-                        </div>
-                        <Button onClick={() => setDrawerOpen(true)} id="add-client-btn" className="h-9 text-sm rounded-xl shadow-none">
-                            <Plus size={15} />
-                            Add Client
-                        </Button>
-                    </div>
+                <div className="relative w-full sm:w-auto mt-2 sm:mt-0">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        id="client-search"
+                        placeholder="Search name, email... "
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-9 h-10 w-full sm:w-64 text-sm rounded-xl border-muted-foreground/10 bg-white shadow-sm"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Table */}
-            <div className="max-w-5xl mx-auto px-6 py-8">
+            <div className="max-w-5xl mx-auto px-6 pb-8">
                 {loading ? (
                     <div className="flex flex-col gap-2">
                         {[...Array(8)].map((_, i) => (

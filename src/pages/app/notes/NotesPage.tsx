@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FileText, Plus, Search, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getNotesByOrg, createNote, getClientsForNotes } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
@@ -82,6 +83,7 @@ export default function NotesPage() {
     const [loading, setLoading] = useState(true)
     const [orgId, setOrgId] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
+    const { setPortalNode } = usePageActions()
 
     useEffect(() => {
         if (!user) return
@@ -124,7 +126,7 @@ export default function NotesPage() {
         }
     }
 
-    async function handleCreateNote() {
+    const handleCreateNote = useCallback(async () => {
         if (!orgId || !user) return
         try {
             const newNote = await createNote(orgId, user.id, 'Untitled Note', [])
@@ -132,7 +134,7 @@ export default function NotesPage() {
         } catch (error) {
             console.error('Failed to create note', error)
         }
-    }
+    }, [orgId, user, navigate])
 
     const filteredNotes = notes.filter((note) =>
         (note.title || 'Untitled Note').toLowerCase().includes(searchQuery.toLowerCase())
@@ -160,23 +162,28 @@ export default function NotesPage() {
         return a.name.localeCompare(b.name)
     })
 
-    return (
-        <div className="flex flex-col h-full bg-background">
-            {/* Header */}
-            <header className="border-b border-border bg-white sticky top-0 z-10 shrink-0 w-full">
-                <div className="flex items-center justify-between max-w-5xl mx-auto px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes</h1>
-                        <p className="text-sm text-muted-foreground">Workspace knowledge and records</p>
-                    </div>
-                    <Button onClick={handleCreateNote}>
-                        <Plus size={16} />
-                        New Note
-                    </Button>
-                </div>
-            </header>
+    // Inject the "New Note" button into the Island navigation
+    useEffect(() => {
+        setPortalNode(
+            <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
+                <Plus size={15} className="mr-1 sm:mr-1.5" />
+                <span className="hidden sm:inline">New Note</span>
+                <span className="inline sm:hidden">New</span>
+            </Button>
+        )
+        return () => setPortalNode(null)
+    }, [handleCreateNote, setPortalNode])
 
-            <div className="flex-1 overflow-y-auto py-8 pb-20">
+    return (
+        <div className="flex flex-col h-full bg-transparent pt-4">
+            <div className="w-full max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes</h1>
+                    <p className="text-sm text-muted-foreground">Workspace knowledge and records</p>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pb-20">
                 <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
 
                     {/* Toolbar */}

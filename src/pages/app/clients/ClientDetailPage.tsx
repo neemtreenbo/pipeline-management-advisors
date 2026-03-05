@@ -27,6 +27,21 @@ interface Client {
     updated_at: string
     owner_id: string
     org_id: string
+    job_title?: string | null
+    occupation?: string | null
+    profile_picture_url?: string | null
+    experiences?: any | null
+    education?: any | null
+    updates?: any | null
+    ai_summary?: string | null
+    talking_points?: any | null
+    company_name?: string | null
+    company_industry?: string | null
+    company_website?: string | null
+    linkedin_url?: string | null
+    facebook_url?: string | null
+    instagram_url?: string | null
+    tiktok_url?: string | null
 }
 
 const SOURCE_COLORS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
@@ -49,11 +64,22 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function InfoRow({ label, value }: { label: string; value: string | null }) {
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+    if (!value) return null
+
+    // Check if it's a URL
+    const isUrl = value.startsWith('http://') || value.startsWith('https://')
+
     return (
         <div className="flex flex-col gap-0.5">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
-            <span className="text-sm text-foreground">{value ?? '—'}</span>
+            {isUrl ? (
+                <a href={value} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline break-all">
+                    {value}
+                </a>
+            ) : (
+                <span className="text-sm text-foreground break-words">{value}</span>
+            )}
         </div>
     )
 }
@@ -236,8 +262,12 @@ export default function ClientDetailPage() {
                         {/* Client Header */}
                         <div className="flex items-start gap-4 mb-6">
                             {/* Avatar */}
-                            <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                <span className="text-lg font-bold text-foreground">{getInitials(client.name)}</span>
+                            <div className="w-14 h-14 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                                {client.profile_picture_url ? (
+                                    <img src={client.profile_picture_url} alt={client.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-lg font-bold text-foreground">{getInitials(client.name)}</span>
+                                )}
                             </div>
 
                             <div className="flex-1 min-w-0">
@@ -417,6 +447,96 @@ export default function ClientDetailPage() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Professional Info */}
+                            {(client.company_name || client.company_industry || client.company_website || client.job_title || client.occupation) && (
+                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
+                                    <h3 className="text-sm font-semibold text-foreground">Professional Summary</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <InfoRow label="Company" value={client.company_name} />
+                                        <InfoRow label="Industry" value={client.company_industry} />
+                                        <InfoRow label="Website" value={client.company_website} />
+                                        <InfoRow label="Job Title" value={client.job_title} />
+                                        <InfoRow label="Occupation" value={client.occupation} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Social Media Links */}
+                            {(client.linkedin_url || client.facebook_url || client.instagram_url || client.tiktok_url) && (
+                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
+                                    <h3 className="text-sm font-semibold text-foreground">Social Links</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <InfoRow label="LinkedIn" value={client.linkedin_url} />
+                                        <InfoRow label="Facebook" value={client.facebook_url} />
+                                        <InfoRow label="Instagram" value={client.instagram_url} />
+                                        <InfoRow label="TikTok" value={client.tiktok_url} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Network Data (Scraped) */}
+                            {(client.ai_summary || client.talking_points || client.experiences || client.education || client.updates) && (
+                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
+                                    <h3 className="text-sm font-semibold text-foreground">LinkedIn Intelligence</h3>
+
+                                    {client.ai_summary && (
+                                        <div className="flex flex-col gap-1.5 pb-2">
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">AI Summary</span>
+                                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{client.ai_summary}</p>
+                                        </div>
+                                    )}
+
+                                    {client.talking_points && (
+                                        <div className="flex flex-col gap-1.5 py-2 border-t border-border/50">
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Talking Points</span>
+                                            {Array.isArray(client.talking_points) ? (
+                                                <ul className="list-disc list-inside text-sm text-foreground space-y-1 mt-1">
+                                                    {(client.talking_points as string[]).map((point, idx) => (
+                                                        <li key={idx} className="leading-relaxed">{point}</li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-foreground bg-muted/30 p-3 rounded-lg mt-1 font-mono break-all whitespace-pre-wrap">
+                                                    {typeof client.talking_points === 'string' ? client.talking_points : JSON.stringify(client.talking_points, null, 2)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {(client.experiences || client.education || client.updates) && (
+                                        <div className="flex flex-col gap-2 py-2 border-t border-border/50">
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Raw Data (JSON)</span>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
+                                                {client.experiences && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-muted-foreground font-medium">Experiences</span>
+                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
+                                                            {typeof client.experiences === 'string' ? client.experiences : JSON.stringify(client.experiences, null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                                {client.education && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs text-muted-foreground font-medium">Education</span>
+                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
+                                                            {typeof client.education === 'string' ? client.education : JSON.stringify(client.education, null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                                {client.updates && (
+                                                    <div className="flex flex-col gap-1 md:col-span-2">
+                                                        <span className="text-xs text-muted-foreground font-medium">Updates</span>
+                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
+                                                            {typeof client.updates === 'string' ? client.updates : JSON.stringify(client.updates, null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </TabsContent>
 

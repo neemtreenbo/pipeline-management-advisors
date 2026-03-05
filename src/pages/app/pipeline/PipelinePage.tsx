@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, LayoutGrid } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import {
     PIPELINE_STAGES,
@@ -29,6 +30,7 @@ export default function PipelinePage() {
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
+    const { setPortalNode } = usePageActions()
 
     // Fetch org membership once
     useEffect(() => {
@@ -221,32 +223,37 @@ export default function PipelinePage() {
         setShowNewDeal(true)
     }
 
+    // Inject the "New Deal" button into the Island navigation
+    useEffect(() => {
+        setPortalNode(
+            <Button
+                id="nav-new-deal-btn"
+                onClick={() => handleOpenNewDeal('Opportunity')}
+                className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3"
+            >
+                <Plus size={15} className="mr-1 sm:mr-1.5" />
+                <span className="hidden sm:inline">New Deal</span>
+                <span className="inline sm:hidden">New</span>
+            </Button>
+        )
+        return () => setPortalNode(null)
+    }, [setPortalNode])
+
     const totalDeals = deals.length
 
     return (
-        <div className="min-h-screen bg-background flex flex-col">
-            {/* Header */}
-            <div className="border-b border-border bg-white sticky top-0 z-10 w-full">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <LayoutGrid size={20} className="text-muted-foreground" />
-                        <div>
-                            <h1 className="text-xl font-semibold text-foreground">Pipeline</h1>
-                            {!loading && (
-                                <p className="text-xs text-muted-foreground">
-                                    {totalDeals} {totalDeals === 1 ? 'deal' : 'deals'}
-                                </p>
-                            )}
-                        </div>
+        <div className="min-h-screen bg-transparent flex flex-col pt-4">
+            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+                <div className="flex items-center gap-3">
+                    <LayoutGrid size={20} className="text-muted-foreground" />
+                    <div>
+                        <h1 className="text-2xl font-semibold text-foreground">Pipeline</h1>
+                        {!loading && (
+                            <p className="text-sm text-muted-foreground">
+                                {totalDeals} {totalDeals === 1 ? 'deal' : 'deals'}
+                            </p>
+                        )}
                     </div>
-                    <Button
-                        id="new-deal-btn"
-                        onClick={() => handleOpenNewDeal('Opportunity')}
-
-                    >
-                        <Plus size={16} />
-                        New Deal
-                    </Button>
                 </div>
             </div>
 

@@ -57,47 +57,146 @@ export type Database = {
       }
       clients: {
         Row: {
+          ai_summary: string | null
+          company_industry: string | null
+          company_name: string | null
+          company_website: string | null
           created_at: string | null
           data: Json | null
+          education: Json | null
           email: string | null
+          experiences: Json | null
+          facebook_url: string | null
           id: string
+          instagram_url: string | null
+          job_title: string | null
+          linkedin_url: string | null
           name: string
+          occupation: string | null
           org_id: string
           owner_id: string
           phone: string | null
+          profile_picture_url: string | null
           source: string | null
           tags: string[] | null
+          talking_points: Json | null
+          tiktok_url: string | null
           updated_at: string | null
+          updates: Json | null
         }
         Insert: {
+          ai_summary?: string | null
+          company_industry?: string | null
+          company_name?: string | null
+          company_website?: string | null
           created_at?: string | null
           data?: Json | null
+          education?: Json | null
           email?: string | null
+          experiences?: Json | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
+          job_title?: string | null
+          linkedin_url?: string | null
           name: string
+          occupation?: string | null
           org_id: string
           owner_id: string
           phone?: string | null
+          profile_picture_url?: string | null
           source?: string | null
           tags?: string[] | null
+          talking_points?: Json | null
+          tiktok_url?: string | null
           updated_at?: string | null
+          updates?: Json | null
         }
         Update: {
+          ai_summary?: string | null
+          company_industry?: string | null
+          company_name?: string | null
+          company_website?: string | null
           created_at?: string | null
           data?: Json | null
+          education?: Json | null
           email?: string | null
+          experiences?: Json | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
+          job_title?: string | null
+          linkedin_url?: string | null
           name?: string
+          occupation?: string | null
           org_id?: string
           owner_id?: string
           phone?: string | null
+          profile_picture_url?: string | null
           source?: string | null
           tags?: string[] | null
+          talking_points?: Json | null
+          tiktok_url?: string | null
           updated_at?: string | null
+          updates?: Json | null
         }
         Relationships: [
           {
             foreignKeyName: "clients_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_attachments: {
+        Row: {
+          created_at: string | null
+          deal_id: string
+          file_name: string
+          file_type: string
+          id: string
+          mime_type: string | null
+          org_id: string
+          size_bytes: number | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string | null
+          deal_id: string
+          file_name: string
+          file_type?: string
+          id?: string
+          mime_type?: string | null
+          org_id: string
+          size_bytes?: number | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string | null
+          deal_id?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          mime_type?: string | null
+          org_id?: string
+          size_bytes?: number | null
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_attachments_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_attachments_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -112,6 +211,7 @@ export type Database = {
           data: Json | null
           expected_close_date: string | null
           id: string
+          order_index: number | null
           org_id: string
           owner_id: string
           stage: string
@@ -124,6 +224,7 @@ export type Database = {
           data?: Json | null
           expected_close_date?: string | null
           id?: string
+          order_index?: number | null
           org_id: string
           owner_id: string
           stage?: string
@@ -136,6 +237,7 @@ export type Database = {
           data?: Json | null
           expected_close_date?: string | null
           id?: string
+          order_index?: number | null
           org_id?: string
           owner_id?: string
           stage?: string

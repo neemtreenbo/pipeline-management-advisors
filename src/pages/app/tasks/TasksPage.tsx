@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, CheckSquare } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getTasks, updateTask } from '@/lib/tasks'
 import type { Task } from '@/lib/tasks'
@@ -22,6 +23,7 @@ export default function TasksPage() {
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [taskToEdit, setTaskToEdit] = useState<Task | undefined>(undefined)
+    const { setPortalNode } = usePageActions()
 
     useEffect(() => {
         if (!user) return
@@ -91,26 +93,31 @@ export default function TasksPage() {
         setIsDialogOpen(true)
     }
 
-    return (
-        <div className="flex flex-col h-full bg-background relative">
-            {/* Header */}
-            <header className="border-b border-border bg-white sticky top-0 z-10 shrink-0 w-full">
-                <div className="flex items-center justify-between max-w-5xl mx-auto px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-                            <CheckSquare size={24} className="text-muted-foreground" />
-                            Tasks
-                        </h1>
-                        <p className="text-sm text-muted-foreground">Execution tracking and follow-ups</p>
-                    </div>
-                    <Button onClick={openCreateDialog}>
-                        <Plus size={16} className="mr-2" />
-                        Add Task
-                    </Button>
-                </div>
-            </header>
+    // Inject the "Add Task" button into the Island navigation
+    useEffect(() => {
+        setPortalNode(
+            <Button onClick={openCreateDialog} className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
+                <Plus size={15} className="mr-1 sm:mr-1.5" />
+                <span className="hidden sm:inline">Add Task</span>
+                <span className="inline sm:hidden">Add</span>
+            </Button>
+        )
+        return () => setPortalNode(null)
+    }, [setPortalNode])
 
-            <div className="flex-1 overflow-y-auto py-8 pb-20">
+    return (
+        <div className="flex flex-col h-full bg-transparent relative pt-4">
+            <div className="w-full max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+                        <CheckSquare size={24} className="text-muted-foreground" />
+                        Tasks
+                    </h1>
+                    <p className="text-sm text-muted-foreground">Execution tracking and follow-ups</p>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pb-20">
                 <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
 
                     <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="w-full sm:w-auto self-start">
