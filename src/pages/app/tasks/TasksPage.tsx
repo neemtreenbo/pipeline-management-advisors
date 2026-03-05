@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, CheckSquare } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
@@ -107,15 +107,6 @@ export default function TasksPage() {
 
     return (
         <div className="flex flex-col h-full bg-transparent relative pt-4">
-            <div className="w-full max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-                        <CheckSquare size={24} className="text-muted-foreground" />
-                        Tasks
-                    </h1>
-                    <p className="text-sm text-muted-foreground">Execution tracking and follow-ups</p>
-                </div>
-            </div>
 
             <div className="flex-1 overflow-y-auto pb-20">
                 <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">

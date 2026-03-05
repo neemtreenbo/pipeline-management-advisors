@@ -162,42 +162,32 @@ export default function NotesPage() {
         return a.name.localeCompare(b.name)
     })
 
-    // Inject the "New Note" button into the Island navigation
+    // Inject the Search and "New Note" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
-                <Plus size={15} className="mr-1 sm:mr-1.5" />
-                <span className="hidden sm:inline">New Note</span>
-                <span className="inline sm:hidden">New</span>
-            </Button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search notes..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
+                    />
+                </div>
+                <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus size={14} className="sm:mr-1.5" />
+                    <span className="hidden sm:inline">New</span>
+                </Button>
+            </div>
         )
         return () => setPortalNode(null)
-    }, [handleCreateNote, setPortalNode])
+    }, [handleCreateNote, setPortalNode, searchQuery])
 
     return (
-        <div className="flex flex-col h-full bg-transparent pt-4">
-            <div className="w-full max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes</h1>
-                    <p className="text-sm text-muted-foreground">Workspace knowledge and records</p>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pb-20">
+        <div className="flex flex-col h-full bg-transparent">
+            <div className="flex-1 overflow-y-auto pb-20 mt-4">
                 <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
-
-                    {/* Toolbar */}
-                    <div className="flex items-center gap-4">
-                        <div className="relative flex-1 max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                            <Input
-                                placeholder="Search notes..."
-                                className="pl-9 h-10 w-full bg-white"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
 
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

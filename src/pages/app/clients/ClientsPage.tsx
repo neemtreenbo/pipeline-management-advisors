@@ -111,17 +111,36 @@ export default function ClientsPage() {
         fetchOrgAndClients()
     }, [user, fetchOrgAndClients])
 
-    // Inject the "Add Client" button into the Island navigation
+    // Inject the Search and "Add Client" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <Button onClick={() => setDrawerOpen(true)} id="nav-add-client-btn" className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
-                <Plus size={15} className="mr-1 sm:mr-1.5" />
-                <span className="hidden sm:inline">Add Client</span>
-                <span className="inline sm:hidden">Add</span>
-            </Button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        id="island-client-search"
+                        placeholder="Search clients..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground bg-slate-200/50 hover:bg-slate-200 rounded-full p-0.5 transition-colors"
+                        >
+                            <X size={10} strokeWidth={2.5} />
+                        </button>
+                    )}
+                </div>
+                <Button onClick={() => setDrawerOpen(true)} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus size={14} className="sm:mr-1.5" />
+                    <span className="hidden sm:inline">Add</span>
+                </Button>
+            </div>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode])
+    }, [setPortalNode, search])
 
     useEffect(() => {
         if (inlineEdit) {
@@ -269,34 +288,6 @@ export default function ClientsPage() {
 
     return (
         <div className="min-h-screen bg-transparent pt-4">
-            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        {loading ? '...' : `${clients.length} ${clients.length === 1 ? 'client' : 'clients'}`}
-                    </p>
-                </div>
-
-                <div className="relative w-full sm:w-auto mt-2 sm:mt-0">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        id="client-search"
-                        placeholder="Search name, email... "
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pl-9 h-10 w-full sm:w-64 text-sm rounded-xl border-muted-foreground/10 bg-white shadow-sm"
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {/* Table */}
             <div className="max-w-5xl mx-auto px-6 pb-8">
                 {loading ? (

@@ -64,11 +64,11 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
-    if (!value) return null
+function InfoRow({ label, value, showEmpty = false }: { label: string; value: string | null | undefined, showEmpty?: boolean }) {
+    if (!value && !showEmpty) return null
 
     // Check if it's a URL
-    const isUrl = value.startsWith('http://') || value.startsWith('https://')
+    const isUrl = value && (value.startsWith('http://') || value.startsWith('https://'))
 
     return (
         <div className="flex flex-col gap-0.5">
@@ -78,7 +78,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
                     {value}
                 </a>
             ) : (
-                <span className="text-sm text-foreground break-words">{value}</span>
+                <span className="text-sm text-foreground break-words">{value || '—'}</span>
             )}
         </div>
     )
@@ -109,10 +109,11 @@ export default function ClientDetailPage() {
 
     // Edit state
     const [editing, setEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '' })
+    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '', linkedin_url: '', instagram_url: '' })
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+    const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
 
     useEffect(() => {
         fetchClient()
@@ -136,6 +137,8 @@ export default function ClientDetailPage() {
                 phone: data.phone ?? '',
                 source: data.source ?? '',
                 tags: (data.tags ?? []).join(', '),
+                linkedin_url: data.linkedin_url ?? '',
+                instagram_url: data.instagram_url ?? '',
             })
             // Fetch linked deals then use their IDs to load all related activities
             fetchDealsByClient(data.id).then(async (clientDeals) => {
@@ -195,6 +198,8 @@ export default function ClientDetailPage() {
             phone: editForm.phone.trim() || null,
             source: editForm.source || null,
             tags: tagsArr,
+            linkedin_url: editForm.linkedin_url.trim() || null,
+            instagram_url: editForm.instagram_url.trim() || null,
         }).eq('id', client.id)
 
         if (error) { setSaveError(error.message); setSaving(false); return }
@@ -211,9 +216,33 @@ export default function ClientDetailPage() {
             phone: client.phone ?? '',
             source: client.source ?? '',
             tags: (client.tags ?? []).join(', '),
+            linkedin_url: client.linkedin_url ?? '',
+            instagram_url: client.instagram_url ?? '',
         })
         setEditing(false)
         setSaveError(null)
+    }
+
+    async function handleSyncLinkedIn() {
+        if (!client || !client.linkedin_url) return;
+        setSyncingLinkedIn(true);
+        try {
+            const { error } = await supabase.functions.invoke('n8n-linkedin-webhook', {
+                body: { id: client.id, linkedin_url: client.linkedin_url }
+            });
+
+            if (error) {
+                console.error("Webhook error:", error);
+                alert("Failed to sync with LinkedIn. See console for details.");
+            } else {
+                await fetchClient();
+            }
+        } catch (err) {
+            console.error("Error invoking webhook:", err);
+            alert("Error invoking webhook.");
+        } finally {
+            setSyncingLinkedIn(false);
+        }
     }
 
     if (loading) {
@@ -323,6 +352,26 @@ export default function ClientDetailPage() {
                                                     value={editForm.tags}
                                                     onChange={e => setEditForm(f => ({ ...f, tags: e.target.value }))}
                                                     placeholder="e.g. VIP, prospect"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                                <Label htmlFor="edit-linkedin">LinkedIn URL</Label>
+                                                <Input
+                                                    id="edit-linkedin"
+                                                    type="url"
+                                                    value={editForm.linkedin_url}
+                                                    onChange={e => setEditForm(f => ({ ...f, linkedin_url: e.target.value }))}
+                                                    placeholder="https://linkedin.com/in/..."
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                                <Label htmlFor="edit-instagram">Instagram URL</Label>
+                                                <Input
+                                                    id="edit-instagram"
+                                                    type="url"
+                                                    value={editForm.instagram_url}
+                                                    onChange={e => setEditForm(f => ({ ...f, instagram_url: e.target.value }))}
+                                                    placeholder="https://instagram.com/..."
                                                 />
                                             </div>
                                         </div>
@@ -463,17 +512,38 @@ export default function ClientDetailPage() {
                             )}
 
                             {/* Social Media Links */}
-                            {(client.linkedin_url || client.facebook_url || client.instagram_url || client.tiktok_url) && (
-                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Social Links</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <InfoRow label="LinkedIn" value={client.linkedin_url} />
-                                        <InfoRow label="Facebook" value={client.facebook_url} />
-                                        <InfoRow label="Instagram" value={client.instagram_url} />
-                                        <InfoRow label="TikTok" value={client.tiktok_url} />
+                            <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
+                                <h3 className="text-sm font-semibold text-foreground">Social Links</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-2">
+                                        <InfoRow label="LinkedIn" value={client.linkedin_url} showEmpty />
+                                        {client.linkedin_url && (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                className="w-fit mt-1"
+                                                onClick={handleSyncLinkedIn}
+                                                disabled={syncingLinkedIn}
+                                            >
+                                                {syncingLinkedIn ? (
+                                                    <>
+                                                        <div className="w-3.5 h-3.5 mr-1.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                                                        Syncing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Activity size={14} className="mr-1.5" />
+                                                        Sync LinkedIn Profile
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
                                     </div>
+                                    <InfoRow label="Instagram" value={client.instagram_url} showEmpty />
+                                    <InfoRow label="Facebook" value={client.facebook_url} />
+                                    <InfoRow label="TikTok" value={client.tiktok_url} />
                                 </div>
-                            )}
+                            </div>
 
                             {/* Network Data (Scraped) */}
                             {(client.ai_summary || client.talking_points || client.experiences || client.education || client.updates) && (

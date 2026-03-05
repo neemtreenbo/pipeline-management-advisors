@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, LayoutGrid } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
@@ -239,24 +239,8 @@ export default function PipelinePage() {
         return () => setPortalNode(null)
     }, [setPortalNode])
 
-    const totalDeals = deals.length
-
     return (
-        <div className="min-h-screen bg-transparent flex flex-col pt-4">
-            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
-                <div className="flex items-center gap-3">
-                    <LayoutGrid size={20} className="text-muted-foreground" />
-                    <div>
-                        <h1 className="text-2xl font-semibold text-foreground">Pipeline</h1>
-                        {!loading && (
-                            <p className="text-sm text-muted-foreground">
-                                {totalDeals} {totalDeals === 1 ? 'deal' : 'deals'}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            </div>
-
+        <div className="min-h-screen bg-transparent flex flex-col">
             {/* Kanban Board */}
             {loading ? (
                 <div className="flex gap-4 px-6 py-8 overflow-x-auto w-full h-full">
