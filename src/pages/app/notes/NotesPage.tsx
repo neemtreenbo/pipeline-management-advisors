@@ -161,11 +161,10 @@ export default function NotesPage() {
     })
 
     return (
-        <div className="flex flex-col h-full bg-transparent">
-            <div className="flex-1 overflow-y-auto pb-20 mt-4">
-                <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
+        <div className="min-h-screen bg-transparent pt-6">
+            <div className="max-w-5xl mx-auto px-6 pb-8">
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-6">
                         <h1 className="text-lg font-semibold text-foreground">Notes</h1>
                         <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
                             <Plus size={14} className="mr-1.5" /> Add
@@ -199,7 +198,6 @@ export default function NotesPage() {
                             ))}
                         </div>
                     )}
-                </div>
             </div>
         </div>
     )

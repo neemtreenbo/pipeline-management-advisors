@@ -6,7 +6,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useOrg } from '@/contexts/OrgContext'
 import GlobalSearch from './GlobalSearch'
 
 const NAV_ITEMS = [
@@ -27,8 +26,7 @@ export default function DynamicIslandNav() {
     const { portalNode } = usePageActions()
     const { theme, toggleTheme } = useTheme()
 
-    const { orgId } = useOrg()
-    const [hoveredPath, setHoveredPath] = useState<string | null>(null)
+const [hoveredPath, setHoveredPath] = useState<string | null>(null)
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
     useEffect(() => {
@@ -96,7 +94,9 @@ export default function DynamicIslandNav() {
 
                 {/* Global search — always visible */}
                 <div className="w-[1px] h-6 bg-border/80 mx-1 shrink-0" />
-                <GlobalSearch />
+                <div className="flex-1 min-w-0">
+                    <GlobalSearch />
+                </div>
 
                 {/* Injected page actions (add buttons, etc.) */}
                 <AnimatePresence>

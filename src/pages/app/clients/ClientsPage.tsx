@@ -246,9 +246,9 @@ const [clients, setClients] = useState<Client[]>([])
     const showTable = !loading && (sorted.length > 0 || addingNew)
 
     return (
-        <div className="min-h-screen bg-transparent pt-4">
+        <div className="min-h-screen bg-transparent pt-6">
             <div className="max-w-5xl mx-auto px-6 pb-8">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-6">
                     <h1 className="text-lg font-semibold text-foreground">Clients</h1>
                     <Button onClick={startAddingNew} className="h-8 text-xs rounded-full px-3 font-medium">
                         <Plus size={14} className="mr-1.5" /> Add

@@ -173,13 +173,9 @@ export default function TasksPage() {
     }
 
     return (
-        <div className="flex flex-col h-full bg-transparent relative pt-6">
-
-            <div className="flex-1 overflow-y-auto pb-20">
-                <div className="max-w-5xl mx-auto px-6 flex flex-col gap-5">
-
-                    {/* Page header */}
-                    <div className="flex items-center justify-between">
+        <div className="min-h-screen bg-transparent pt-6">
+            <div className="max-w-5xl mx-auto px-6 pb-8">
+                    <div className="flex items-center justify-between mb-6">
                         <h1 className="text-lg font-semibold text-foreground">Tasks</h1>
                         <Button onClick={openInlineAdd} className="h-8 text-xs rounded-full px-3 font-medium">
                             <Plus size={14} className="mr-1.5" /> Add
@@ -308,7 +304,6 @@ export default function TasksPage() {
                         </>
                     )}
 
-                </div>
             </div>
         </div>
     )

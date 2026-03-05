@@ -112,8 +112,8 @@ export default function GlobalSearch() {
     const showDropdown = open && query.trim().length >= 2
 
     return (
-        <div ref={containerRef} className="relative">
-            <div className="relative w-[180px] sm:w-[220px]">
+        <div ref={containerRef} className="relative w-full">
+            <div className="relative w-full">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <input
                     ref={inputRef}
