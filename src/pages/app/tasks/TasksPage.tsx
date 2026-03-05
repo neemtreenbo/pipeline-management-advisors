@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
-import { getTasks, createTask, updateTask } from '@/lib/tasks'
+import { getTasks, createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
 
+interface ClientOption { id: string; name: string }
+
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TaskList from '@/components/tasks/TaskList'
-import TaskDialog from '@/components/tasks/TaskDialog'
 
 type ViewType = 'today' | 'upcoming' | 'overdue'
 
@@ -31,17 +33,28 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true)
     const [orgId, setOrgId] = useState<string | null>(null)
     const [view, setView] = useState<ViewType>('today')
+    const [search, setSearch] = useState('')
+
+    // Available clients for @mention
+    const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
+
+    useEffect(() => {
+        if (!orgId) return
+        supabase.from('clients').select('id, name').eq('org_id', orgId).order('name')
+            .then(({ data }) => setAvailableClients(data ?? []))
+    }, [orgId])
 
     // Inline add state
     const [addingNew, setAddingNew] = useState(false)
     const [newTitle, setNewTitle] = useState('')
     const [newDue, setNewDue] = useState(todayString())
+    const [newClientId, setNewClientId] = useState<string>('')
+    const [newMentionQuery, setNewMentionQuery] = useState<string | null>(null)
     const [addSaving, setAddSaving] = useState(false)
     const newTitleRef = useRef<HTMLInputElement>(null)
 
-    // Edit dialog state (edit only, not create)
-    const [taskToEdit, setTaskToEdit] = useState<Task | undefined>(undefined)
-    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    // Inline edit state
+    const [editingTaskId, setEditingTaskId] = useState<string | undefined>(undefined)
 
     const { setPortalNode } = usePageActions()
 
@@ -59,16 +72,16 @@ export default function TasksPage() {
             })
     }, [user])
 
-    const loadTasks = async () => {
+    const loadTasks = async (silent = false) => {
         if (!orgId) return
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             const data = await getTasks({ orgId, view })
             setTasks(data)
         } catch (error) {
             console.error('Failed to load tasks', error)
         } finally {
-            setLoading(false)
+            if (!silent) setLoading(false)
         }
     }
 
@@ -80,6 +93,8 @@ export default function TasksPage() {
     const openInlineAdd = () => {
         setNewTitle('')
         setNewDue(todayString())
+        setNewClientId('')
+        setNewMentionQuery(null)
         setAddingNew(true)
         setTimeout(() => newTitleRef.current?.focus(), 0)
     }
@@ -87,7 +102,34 @@ export default function TasksPage() {
     const cancelInlineAdd = () => {
         setAddingNew(false)
         setNewTitle('')
+        setNewClientId('')
+        setNewMentionQuery(null)
     }
+
+    const handleNewTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value
+        setNewTitle(val)
+        const lastAt = val.lastIndexOf('@')
+        if (lastAt !== -1) {
+            const afterAt = val.slice(lastAt + 1)
+            if (!afterAt.includes(' ')) { setNewMentionQuery(afterAt); return }
+        }
+        setNewMentionQuery(null)
+    }
+
+    const selectNewMention = (c: ClientOption) => {
+        const lastAt = newTitle.lastIndexOf('@')
+        setNewTitle(newTitle.slice(0, lastAt).trimEnd())
+        setNewClientId(c.id)
+        setNewMentionQuery(null)
+        setTimeout(() => newTitleRef.current?.focus(), 0)
+    }
+
+    const newMentionClients = newMentionQuery !== null
+        ? availableClients.filter(c => c.name.toLowerCase().includes(newMentionQuery.toLowerCase())).slice(0, 6)
+        : []
+
+    const newClientName = availableClients.find(c => c.id === newClientId)?.name ?? null
 
     const handleInlineAdd = async () => {
         if (!user || !orgId || !newTitle.trim() || addSaving) return
@@ -102,9 +144,13 @@ export default function TasksPage() {
                 status: 'todo',
                 due_at: toISO(newDue),
             }
-            await createTask(input, [])
+            const task = await createTask(input, [])
+            if (newClientId) {
+                await setTaskClientLink(task.id, orgId, newClientId, user.id)
+            }
             setAddingNew(false)
             setNewTitle('')
+            setNewClientId('')
             await loadTasks()
         } catch (err) {
             console.error('Failed to create task', err)
@@ -127,101 +173,174 @@ export default function TasksPage() {
         }
     }
 
-    const openEditDialog = (task: Task) => {
-        setTaskToEdit(task)
-        setIsDialogOpen(true)
+    const handleInlineEdit = async (task: Task, title: string, dueAt: string, clientId?: string | null) => {
+        // Optimistic update — reflect title/due immediately
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
+        setEditingTaskId(undefined)
+        try {
+            await updateTask(task.id, { title, due_at: toISO(dueAt) })
+            if (orgId && user && clientId !== undefined) {
+                await setTaskClientLink(task.id, orgId, clientId, user.id)
+            }
+            // Silent refresh so client avatar/name reflects the new link without a loading flash
+            await loadTasks(true)
+        } catch {
+            setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+        }
     }
 
-    // Inject the "Add Task" button into the Island navigation
+    // Inject search + "Add Task" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <Button onClick={openInlineAdd} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search tasks..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
+                    />
+                </div>
+                <Button onClick={openInlineAdd} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus size={14} className="sm:mr-1.5" />
+                    <span className="hidden sm:inline">Add</span>
+                </Button>
+            </div>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode])
+    }, [setPortalNode, search])
 
     return (
-        <div className="flex flex-col h-full bg-transparent relative pt-4">
+        <div className="flex flex-col h-full bg-transparent relative pt-6">
 
             <div className="flex-1 overflow-y-auto pb-20">
-                <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
+                <div className="max-w-2xl mx-auto px-6 flex flex-col gap-5">
 
-                    <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="w-full sm:w-auto self-start">
-                        <TabsList className="bg-muted/50 p-1 rounded-xl">
-                            <TabsTrigger value="today" className="rounded-lg px-4 py-2">Today</TabsTrigger>
-                            <TabsTrigger value="upcoming" className="rounded-lg px-4 py-2">Upcoming</TabsTrigger>
-                            <TabsTrigger value="overdue" className="rounded-lg px-4 py-2">Overdue</TabsTrigger>
+                    {/* View tabs */}
+                    <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="self-start">
+                        <TabsList className="bg-transparent p-0 h-auto gap-4">
+                            {(['today', 'upcoming', 'overdue'] as ViewType[]).map(v => (
+                                <TabsTrigger
+                                    key={v}
+                                    value={v}
+                                    className="bg-transparent shadow-none px-0 pb-2 text-sm font-medium capitalize text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none transition-colors"
+                                >
+                                    {v === 'today' ? 'Today' : v === 'upcoming' ? 'Upcoming' : 'Overdue'}
+                                </TabsTrigger>
+                            ))}
                         </TabsList>
                     </Tabs>
 
-                    {/* Inline add row */}
-                    {addingNew && (
-                        <div className="flex items-center gap-3 bg-white border border-border rounded-xl px-4 py-3 shadow-sm">
-                            <div className="w-4 h-4 rounded-full border-2 border-border/60 shrink-0" />
-                            <input
-                                ref={newTitleRef}
-                                className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/40 text-foreground"
-                                placeholder="Task title…"
-                                value={newTitle}
-                                onChange={e => setNewTitle(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter') handleInlineAdd()
-                                    if (e.key === 'Escape') cancelInlineAdd()
-                                }}
-                                disabled={addSaving}
-                            />
-                            <input
-                                type="date"
-                                className="text-[12px] text-muted-foreground/60 bg-transparent outline-none border-0 cursor-pointer"
-                                value={newDue}
-                                onChange={e => setNewDue(e.target.value)}
-                                disabled={addSaving}
-                            />
-                            <button
-                                onClick={handleInlineAdd}
-                                disabled={addSaving || !newTitle.trim()}
-                                className="text-[12px] font-medium text-foreground hover:text-foreground/70 disabled:text-muted-foreground/30 transition-colors px-1"
-                            >
-                                {addSaving ? 'Saving…' : 'Save'}
-                            </button>
-                            <button
-                                onClick={cancelInlineAdd}
-                                className="text-[12px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-
+                    {/* Content */}
                     {loading ? (
-                        <div className="bg-white rounded-xl border border-border h-[200px] flex items-center justify-center">
-                            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                        <div className="flex flex-col gap-1">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />
+                            ))}
                         </div>
                     ) : (
-                        <TaskList
-                            tasks={tasks}
-                            onToggleComplete={handleToggleComplete}
-                            onTaskClick={openEditDialog}
-                            emptyMessage={`No ${view} tasks found.`}
-                        />
+                        <>
+                            {/* Inline add row — inserted at top of list visually */}
+                            {addingNew && (
+                                <div className="bg-white rounded-xl border border-border/60 shadow-sm overflow-hidden">
+                                    <div className="flex items-center gap-3 px-4 py-3">
+                                        <div className="w-4 h-4 rounded-full border border-border/50 shrink-0" />
+                                        <input
+                                            ref={newTitleRef}
+                                            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/30 text-foreground"
+                                            placeholder="Task title… type @ to link a client"
+                                            value={newTitle}
+                                            onChange={handleNewTitleChange}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Escape') {
+                                                    if (newMentionQuery !== null) { setNewMentionQuery(null); return }
+                                                    cancelInlineAdd()
+                                                }
+                                                if (e.key === 'Enter' && newMentionQuery === null) handleInlineAdd()
+                                            }}
+                                            disabled={addSaving}
+                                        />
+                                        <input
+                                            type="date"
+                                            className="text-[11px] text-muted-foreground/50 bg-transparent outline-none border-0 cursor-pointer"
+                                            value={newDue}
+                                            onChange={e => setNewDue(e.target.value)}
+                                            disabled={addSaving}
+                                        />
+                                        <button
+                                            onClick={handleInlineAdd}
+                                            disabled={addSaving || !newTitle.trim()}
+                                            className="text-[11px] font-medium text-foreground hover:text-foreground/60 disabled:text-muted-foreground/30 transition-colors"
+                                        >
+                                            {addSaving ? 'Saving…' : 'Save'}
+                                        </button>
+                                        <button
+                                            onClick={cancelInlineAdd}
+                                            className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+
+                                    {/* @mention popup */}
+                                    {newMentionQuery !== null && newMentionClients.length > 0 && newTitleRef.current && (
+                                        <div
+                                            style={{
+                                                position: 'fixed',
+                                                top: newTitleRef.current.getBoundingClientRect().bottom + 4,
+                                                left: newTitleRef.current.getBoundingClientRect().left,
+                                                zIndex: 50,
+                                            }}
+                                            className="bg-white border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
+                                        >
+                                            {newMentionClients.map(c => (
+                                                <button
+                                                    key={c.id}
+                                                    onMouseDown={(e) => { e.preventDefault(); selectNewMention(c) }}
+                                                    className="w-full text-left px-4 py-1.5 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                                >
+                                                    <span className="text-muted-foreground/40 mr-0.5">@</span>
+                                                    {c.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Selected client chip */}
+                                    {newClientId && newClientName && (
+                                        <div className="flex items-center gap-2 px-4 pb-2.5 pl-11">
+                                            <span className="flex items-center gap-1 text-[11px] text-foreground/80 bg-muted rounded-full px-2.5 py-0.5">
+                                                <span className="text-foreground/40">@</span>
+                                                {newClientName}
+                                                <button
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => setNewClientId('')}
+                                                    className="ml-0.5 text-foreground/30 hover:text-foreground/60 transition-colors"
+                                                >
+                                                    <X size={9} />
+                                                </button>
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <TaskList
+                                tasks={search.trim() ? tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase())) : tasks}
+                                orgId={orgId ?? undefined}
+                                onToggleComplete={handleToggleComplete}
+                                onTaskClick={(task) => { setAddingNew(false); setEditingTaskId(task.id) }}
+                                editingTaskId={editingTaskId}
+                                onSaveEdit={handleInlineEdit}
+                                onCancelEdit={() => setEditingTaskId(undefined)}
+                                emptyMessage={`No ${view} tasks.`}
+                            />
+                        </>
                     )}
 
                 </div>
             </div>
-
-            {/* Dialog for editing existing tasks only */}
-            {orgId && (
-                <TaskDialog
-                    isOpen={isDialogOpen}
-                    onClose={() => setIsDialogOpen(false)}
-                    onSaved={loadTasks}
-                    orgId={orgId}
-                    taskToEdit={taskToEdit}
-                />
-            )}
         </div>
     )
 }

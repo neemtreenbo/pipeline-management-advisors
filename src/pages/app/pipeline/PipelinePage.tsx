@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
@@ -17,6 +17,7 @@ import type { DealAttachment } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 import NewDealModal from '@/components/pipeline/NewDealModal'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface AttachmentCounts {
     [dealId: string]: { proposal: number; total: number }
@@ -30,6 +31,7 @@ export default function PipelinePage() {
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
+    const [search, setSearch] = useState('')
     const { setPortalNode } = usePageActions()
 
     // Fetch org membership once
@@ -80,6 +82,16 @@ export default function PipelinePage() {
         loadDeals()
     }, [loadDeals])
 
+    // Filter deals by search query
+    const filteredDeals = search.trim()
+        ? deals.filter(d => {
+            const title = (d.data as Record<string, string>)?.title ?? ''
+            const client = d.client?.name ?? ''
+            const q = search.toLowerCase()
+            return title.toLowerCase().includes(q) || client.toLowerCase().includes(q)
+        })
+        : deals
+
     // Deal lookup by stage
     const dealsByStage: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
         (acc, stage) => ({ ...acc, [stage]: [] }),
@@ -87,7 +99,7 @@ export default function PipelinePage() {
     )
 
     // Make sure to order deals within columns for consistent rendering, matching the db index
-    deals.sort((a, b) => {
+    filteredDeals.sort((a, b) => {
         if (a.order_index === b.order_index) {
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         }
@@ -227,20 +239,31 @@ export default function PipelinePage() {
         setShowNewDeal(true)
     }
 
-    // Inject the "New Deal" button into the Island navigation
+    // Inject search + "New Deal" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <Button
-                id="nav-new-deal-btn"
-                onClick={() => handleOpenNewDeal('Opportunity')}
-                className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search pipeline..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
+                    />
+                </div>
+                <Button
+                    id="nav-new-deal-btn"
+                    onClick={() => handleOpenNewDeal('Opportunity')}
+                    className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                    <Plus size={14} className="sm:mr-1.5" />
+                    <span className="hidden sm:inline">Add</span>
+                </Button>
+            </div>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode])
+    }, [setPortalNode, search])
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">

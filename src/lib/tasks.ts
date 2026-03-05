@@ -204,6 +204,22 @@ export async function deleteTask(id: string) {
     return true
 }
 
+export async function setTaskClientLink(taskId: string, orgId: string, clientId: string | null, createdBy: string): Promise<void> {
+    await supabase
+        .from('links')
+        .delete()
+        .eq('from_type', 'task')
+        .eq('from_id', taskId)
+        .eq('to_type', 'client')
+
+    if (clientId) {
+        const { error } = await supabase
+            .from('links')
+            .insert({ org_id: orgId, from_type: 'task', from_id: taskId, to_type: 'client', to_id: clientId, created_by: createdBy })
+        if (error) throw error
+    }
+}
+
 export async function getTaskLinks(taskId: string) {
     const { data, error } = await supabase
         .from('links')
@@ -219,6 +235,7 @@ export type TaskClientInfo = {
     taskId: string
     clientId: string
     clientName: string
+    profilePictureUrl: string | null
 }
 
 export async function getClientsForTasks(taskIds: string[]): Promise<TaskClientInfo[]> {
@@ -274,21 +291,22 @@ export async function getClientsForTasks(taskIds: string[]): Promise<TaskClientI
 
     const { data: clients } = await supabase
         .from('clients')
-        .select('id, name')
+        .select('id, name, profile_picture_url')
         .in('id', Array.from(clientIdsToFetch))
 
     if (!clients) return []
 
-    const clientNameMap = new Map(clients.map(c => [c.id, c.name]))
+    const clientMap = new Map(clients.map(c => [c.id, c]))
 
     const results: TaskClientInfo[] = []
     for (const [taskId, clientId] of taskToClientMap.entries()) {
-        const name = clientNameMap.get(clientId)
-        if (name) {
+        const client = clientMap.get(clientId)
+        if (client) {
             results.push({
                 taskId,
                 clientId,
-                clientName: name
+                clientName: client.name,
+                profilePictureUrl: client.profile_picture_url ?? null,
             })
         }
     }
