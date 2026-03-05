@@ -41,11 +41,11 @@ export default function DynamicIslandNav() {
     const avatarUrl = user?.user_metadata?.avatar_url
 
     return (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 w-full flex justify-center pointer-events-none">
+        <div className="sticky top-0 z-50 w-full pt-6 pb-4 px-4 flex justify-center bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/60 shrink-0">
             <motion.nav
                 layout
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                className="pointer-events-auto flex items-center bg-white/80 backdrop-blur-xl border border-white shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08)] rounded-full p-1.5 gap-1"
+                className="flex items-center bg-white border border-slate-200 shadow-sm rounded-full p-1.5 gap-1"
             >
                 {/* Render any injected page actions inline with the island */}
                 <AnimatePresence>

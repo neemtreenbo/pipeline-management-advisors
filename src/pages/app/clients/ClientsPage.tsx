@@ -20,6 +20,7 @@ interface Client {
     created_at: string
     owner_id: string
     org_id: string
+    profile_picture_url?: string | null
 }
 
 type InlineEdit = {
@@ -312,9 +313,9 @@ export default function ClientsPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="rounded-2xl border border-border overflow-hidden bg-white shadow-sm">
+                    <div className="rounded-2xl border border-border bg-white shadow-sm flex flex-col">
                         {/* Table header */}
-                        <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 border-b border-border bg-muted/30 px-5 py-2.5">
+                        <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 border-b border-border bg-muted/95 backdrop-blur-sm px-5 py-2.5 sticky top-0 z-10 rounded-t-2xl">
                             {[
                                 { field: 'name', label: 'Name' },
                                 { field: 'source', label: 'Source' },
@@ -357,8 +358,12 @@ export default function ClientsPage() {
                                         className="min-w-0 pr-4 flex items-center gap-3 cursor-pointer"
                                         onClick={() => navigate(`/app/clients/${client.id}`)}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                            <span className="text-xs font-bold text-primary">{getInitials(client.name)}</span>
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {client.profile_picture_url ? (
+                                                <img src={client.profile_picture_url} alt={client.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-xs font-bold text-primary">{getInitials(client.name)}</span>
+                                            )}
                                         </div>
                                         <span className="text-sm font-medium text-foreground truncate group-hover:underline">{client.name}</span>
                                     </div>

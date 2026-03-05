@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, ChevronRight, Linkedin, Instagram } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchDealsByClient } from '@/lib/deals'
 import type { Deal } from '@/lib/deals'
@@ -109,7 +109,7 @@ export default function ClientDetailPage() {
 
     // Edit state
     const [editing, setEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '', linkedin_url: '', instagram_url: '' })
+    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '' })
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
@@ -137,8 +137,6 @@ export default function ClientDetailPage() {
                 phone: data.phone ?? '',
                 source: data.source ?? '',
                 tags: (data.tags ?? []).join(', '),
-                linkedin_url: data.linkedin_url ?? '',
-                instagram_url: data.instagram_url ?? '',
             })
             // Fetch linked deals then use their IDs to load all related activities
             fetchDealsByClient(data.id).then(async (clientDeals) => {
@@ -198,8 +196,6 @@ export default function ClientDetailPage() {
             phone: editForm.phone.trim() || null,
             source: editForm.source || null,
             tags: tagsArr,
-            linkedin_url: editForm.linkedin_url.trim() || null,
-            instagram_url: editForm.instagram_url.trim() || null,
         }).eq('id', client.id)
 
         if (error) { setSaveError(error.message); setSaving(false); return }
@@ -216,8 +212,6 @@ export default function ClientDetailPage() {
             phone: client.phone ?? '',
             source: client.source ?? '',
             tags: (client.tags ?? []).join(', '),
-            linkedin_url: client.linkedin_url ?? '',
-            instagram_url: client.instagram_url ?? '',
         })
         setEditing(false)
         setSaveError(null)
@@ -273,21 +267,8 @@ export default function ClientDetailPage() {
         <>
             <Tabs defaultValue="overview" className="min-h-screen bg-background flex flex-col">
                 <div className="sticky top-0 z-20 bg-background shadow-sm border-b border-border">
-                    {/* Top bar */}
-                    <div className="border-b border-border bg-white">
-                        <div className="max-w-4xl mx-auto px-6 py-3 flex items-center gap-3">
-                            <button
-                                onClick={() => navigate('/app/clients')}
-                                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                id="back-to-clients"
-                            >
-                                <ArrowLeft size={16} />
-                                Clients
-                            </button>
-                        </div>
-                    </div>
 
-                    <div className="max-w-4xl mx-auto px-6 pt-8 pb-0">
+                    <div className="max-w-4xl mx-auto px-6 pt-4 pb-0">
                         {/* Client Header */}
                         <div className="flex items-start gap-4 mb-6">
                             {/* Avatar */}
@@ -352,26 +333,6 @@ export default function ClientDetailPage() {
                                                     value={editForm.tags}
                                                     onChange={e => setEditForm(f => ({ ...f, tags: e.target.value }))}
                                                     placeholder="e.g. VIP, prospect"
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <Label htmlFor="edit-linkedin">LinkedIn URL</Label>
-                                                <Input
-                                                    id="edit-linkedin"
-                                                    type="url"
-                                                    value={editForm.linkedin_url}
-                                                    onChange={e => setEditForm(f => ({ ...f, linkedin_url: e.target.value }))}
-                                                    placeholder="https://linkedin.com/in/..."
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <Label htmlFor="edit-instagram">Instagram URL</Label>
-                                                <Input
-                                                    id="edit-instagram"
-                                                    type="url"
-                                                    value={editForm.instagram_url}
-                                                    onChange={e => setEditForm(f => ({ ...f, instagram_url: e.target.value }))}
-                                                    placeholder="https://instagram.com/..."
                                                 />
                                             </div>
                                         </div>
@@ -446,6 +407,10 @@ export default function ClientDetailPage() {
                                     <LayoutGrid size={14} className="mr-1.5" />
                                     Overview
                                 </TabsTrigger>
+                                <TabsTrigger value="intel" id="tab-intel">
+                                    <Activity size={14} className="mr-1.5" />
+                                    Intel
+                                </TabsTrigger>
                                 <TabsTrigger value="deals" id="tab-deals">
                                     <Briefcase size={14} className="mr-1.5" />
                                     Deals
@@ -510,171 +475,253 @@ export default function ClientDetailPage() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </TabsContent>
 
-                            {/* Social Media Links */}
-                            <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
-                                <h3 className="text-sm font-semibold text-foreground">Social Links</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-2">
-                                        <InfoRow label="LinkedIn" value={client.linkedin_url} showEmpty />
-                                        {client.linkedin_url && (
+                    {/* Intel Tab */}
+                    <TabsContent value="intel">
+                        <div className="flex flex-col gap-8 animate-in fade-in duration-300 mt-2">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Left Column: Inputs */}
+                                <div className="lg:col-span-1 flex flex-col gap-6">
+                                    <div className="flex flex-col gap-4">
+                                        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <Linkedin size={16} className="text-muted-foreground" />
+                                            LinkedIn Profile
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            <Input
+                                                id="intel-linkedin"
+                                                placeholder="https://linkedin.com/in/..."
+                                                className="bg-white"
+                                                value={client.linkedin_url || ''}
+                                                onChange={async (e) => {
+                                                    const val = e.target.value;
+                                                    setClient(c => c ? { ...c, linkedin_url: val } : c);
+                                                    await supabase.from('clients').update({ linkedin_url: val || null }).eq('id', client.id);
+                                                }}
+                                            />
                                             <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                className="w-fit mt-1"
                                                 onClick={handleSyncLinkedIn}
-                                                disabled={syncingLinkedIn}
+                                                disabled={syncingLinkedIn || !client.linkedin_url}
+                                                variant="secondary"
+                                                className="w-full justify-start mt-2"
                                             >
                                                 {syncingLinkedIn ? (
                                                     <>
-                                                        <div className="w-3.5 h-3.5 mr-1.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                                                        Syncing...
+                                                        <div className="w-4 h-4 mr-2 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                                                        Syncing Data...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Activity size={14} className="mr-1.5" />
-                                                        Sync LinkedIn Profile
+                                                        <Activity size={16} className="mr-2 text-muted-foreground" />
+                                                        Sync Profile Data
                                                     </>
                                                 )}
                                             </Button>
-                                        )}
+                                        </div>
                                     </div>
-                                    <InfoRow label="Instagram" value={client.instagram_url} showEmpty />
-                                    <InfoRow label="Facebook" value={client.facebook_url} />
-                                    <InfoRow label="TikTok" value={client.tiktok_url} />
-                                </div>
-                            </div>
 
-                            {/* Network Data (Scraped) */}
-                            {(client.ai_summary || client.talking_points || client.experiences || client.education || client.updates) && (
-                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
-                                    <h3 className="text-sm font-semibold text-foreground">LinkedIn Intelligence</h3>
-
-                                    {client.ai_summary && (
-                                        <div className="flex flex-col gap-1.5 pb-2">
-                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">AI Summary</span>
-                                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{client.ai_summary}</p>
+                                    <div className="flex flex-col gap-4 pt-6 border-t border-border">
+                                        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <Instagram size={16} className="text-muted-foreground" />
+                                            Instagram Profile
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            <Input
+                                                id="intel-instagram"
+                                                placeholder="https://instagram.com/..."
+                                                className="bg-white"
+                                                value={client.instagram_url || ''}
+                                                onChange={async (e) => {
+                                                    const val = e.target.value;
+                                                    setClient(c => c ? { ...c, instagram_url: val } : c);
+                                                    await supabase.from('clients').update({ instagram_url: val || null }).eq('id', client.id);
+                                                }}
+                                            />
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {client.talking_points && (
-                                        <div className="flex flex-col gap-1.5 py-2 border-t border-border/50">
-                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Talking Points</span>
-                                            {Array.isArray(client.talking_points) ? (
-                                                <ul className="list-disc list-inside text-sm text-foreground space-y-1 mt-1">
-                                                    {(client.talking_points as string[]).map((point, idx) => (
-                                                        <li key={idx} className="leading-relaxed">{point}</li>
-                                                    ))}
-                                                </ul>
-                                            ) : (
-                                                <p className="text-sm text-foreground bg-muted/30 p-3 rounded-lg mt-1 font-mono break-all whitespace-pre-wrap">
-                                                    {typeof client.talking_points === 'string' ? client.talking_points : JSON.stringify(client.talking_points, null, 2)}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {(client.experiences || client.education || client.updates) && (
-                                        <div className="flex flex-col gap-2 py-2 border-t border-border/50">
-                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Raw Data (JSON)</span>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
-                                                {client.experiences && (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-muted-foreground font-medium">Experiences</span>
-                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
-                                                            {typeof client.experiences === 'string' ? client.experiences : JSON.stringify(client.experiences, null, 2)}
-                                                        </pre>
-                                                    </div>
-                                                )}
-                                                {client.education && (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs text-muted-foreground font-medium">Education</span>
-                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
-                                                            {typeof client.education === 'string' ? client.education : JSON.stringify(client.education, null, 2)}
-                                                        </pre>
-                                                    </div>
-                                                )}
-                                                {client.updates && (
-                                                    <div className="flex flex-col gap-1 md:col-span-2">
-                                                        <span className="text-xs text-muted-foreground font-medium">Updates</span>
-                                                        <pre className="text-xs text-foreground bg-muted p-2 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">
-                                                            {typeof client.updates === 'string' ? client.updates : JSON.stringify(client.updates, null, 2)}
-                                                        </pre>
-                                                    </div>
-                                                )}
+                                    {/* Facebook & TikTok static Info */}
+                                    {(client.facebook_url || client.tiktok_url) && (
+                                        <div className="flex flex-col gap-4 pt-6 border-t border-border">
+                                            <h3 className="text-sm font-medium text-foreground">Other Platforms</h3>
+                                            <div className="flex flex-col gap-3">
+                                                <InfoRow label="Facebook" value={client.facebook_url} />
+                                                <InfoRow label="TikTok" value={client.tiktok_url} />
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            )}
+
+                                {/* Right Column: Insight Displays */}
+                                <div className="lg:col-span-2 flex flex-col gap-6">
+                                    {!client.ai_summary && !client.talking_points && !client.experiences && !client.education ? (
+                                        <div className="rounded-xl border border-dashed border-border bg-muted/30 min-h-[300px] flex flex-col items-center justify-center text-center p-8">
+                                            <Activity className="text-muted-foreground mb-4" size={24} />
+                                            <h3 className="text-sm font-medium text-foreground mb-1">No Intelligence Gathered</h3>
+                                            <p className="text-sm text-muted-foreground max-w-sm">Enter a LinkedIn URL and sync to extract professional insights.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col gap-6">
+                                            {/* AI Summary */}
+                                            {client.ai_summary && (
+                                                <div className="flex flex-col gap-3">
+                                                    <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                                        <FileText size={16} className="text-muted-foreground" />
+                                                        Summary
+                                                    </h3>
+                                                    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                        <p className="text-[15px] text-foreground leading-relaxed">{client.ai_summary}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Talking Points */}
+                                            {client.talking_points && (
+                                                <div className="flex flex-col gap-3">
+                                                    <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                                        <CheckSquare size={16} className="text-muted-foreground" />
+                                                        Talking Points
+                                                    </h3>
+                                                    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                        {(() => {
+                                                            const tp = client.talking_points as any;
+                                                            const pointsArray = Array.isArray(tp) ? tp : (tp?.items && Array.isArray(tp.items) ? tp.items : null);
+
+                                                            if (pointsArray) {
+                                                                return (
+                                                                    <ul className="space-y-3">
+                                                                        {pointsArray.map((point: string, idx: number) => (
+                                                                            <li key={idx} className="flex gap-3 text-[15px] text-foreground">
+                                                                                <span className="text-muted-foreground select-none">•</span>
+                                                                                <span className="leading-relaxed">{point}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <p className="text-[15px] text-foreground font-mono break-all whitespace-pre-wrap">
+                                                                    {typeof tp === 'string' ? tp : JSON.stringify(tp, null, 2)}
+                                                                </p>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Raw Data Accordions / Sections */}
+                                            {(client.experiences || client.education || client.updates) && (
+                                                <div className="flex flex-col gap-3">
+                                                    <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                                        <LayoutGrid size={16} className="text-muted-foreground" />
+                                                        Additional Information
+                                                    </h3>
+                                                    <div className="flex flex-col gap-4">
+                                                        {client.experiences && (
+                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                                <h4 className="text-sm font-semibold text-foreground mb-3">Experiences</h4>
+                                                                <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
+                                                                    {typeof client.experiences === 'string' ? client.experiences : JSON.stringify(client.experiences, null, 2)}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {client.education && (
+                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                                <h4 className="text-sm font-semibold text-foreground mb-3">Education</h4>
+                                                                <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
+                                                                    {typeof client.education === 'string' ? client.education : JSON.stringify(client.education, null, 2)}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {client.updates && (
+                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                                <h4 className="text-sm font-semibold text-foreground mb-3">Updates</h4>
+                                                                <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
+                                                                    {typeof client.updates === 'string' ? client.updates : JSON.stringify(client.updates, null, 2)}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </TabsContent>
 
                     {/* Deals */}
-                    <TabsContent value="deals">
-                        {deals.length === 0 ? (
-                            <EmptySection icon={Briefcase} label="deals" />
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {deals.map((deal) => {
-                                    const title = (deal.data as Record<string, string>)?.title || client?.name || '—'
-                                    const formattedValue = deal.value > 0
-                                        ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(deal.value)
-                                        : null
-                                    return (
-                                        <button
-                                            key={deal.id}
-                                            type="button"
-                                            onClick={() => setSelectedDealId(deal.id)}
-                                            className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-5 py-4 hover:border-zinc-300 hover:shadow-md transition-all"
-                                            id={`deal-link-${deal.id}`}
-                                        >
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-muted-foreground shrink-0 border border-border/50 bg-muted/30 rounded p-0.5 shadow-sm">
-                                                        {getDealIcon(title, 14)}
-                                                    </span>
-                                                    <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-                                                </div>
-                                                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                                    <span className="text-xs text-muted-foreground">{deal.stage}</span>
-                                                    {formattedValue && (
-                                                        <span className="text-xs font-medium text-foreground">{formattedValue}</span>
-                                                    )}
-                                                    {deal.expected_close_date && (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    < TabsContent value="deals" >
+                        {
+                            deals.length === 0 ? (
+                                <EmptySection icon={Briefcase} label="deals" />
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {deals.map((deal) => {
+                                        const title = (deal.data as Record<string, string>)?.title || client?.name || '—'
+                                        const formattedValue = deal.value > 0
+                                            ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(deal.value)
+                                            : null
+                                        return (
+                                            <button
+                                                key={deal.id}
+                                                type="button"
+                                                onClick={() => setSelectedDealId(deal.id)}
+                                                className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-5 py-4 hover:border-zinc-300 hover:shadow-md transition-all"
+                                                id={`deal-link-${deal.id}`}
+                                            >
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-muted-foreground shrink-0 border border-border/50 bg-muted/30 rounded p-0.5 shadow-sm">
+                                                            {getDealIcon(title, 14)}
                                                         </span>
-                                                    )}
+                                                        <p className="text-sm font-semibold text-foreground truncate">{title}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                                        <span className="text-xs text-muted-foreground">{deal.stage}</span>
+                                                        {formattedValue && (
+                                                            <span className="text-xs font-medium text-foreground">{formattedValue}</span>
+                                                        )}
+                                                        {deal.expected_close_date && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </TabsContent>
+                                                <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )
+                        }
+                    </TabsContent >
 
                     {/* Tasks */}
-                    <TabsContent value="tasks">
-                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} />}
-                    </TabsContent>
+                    < TabsContent value="tasks" >
+                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} />
+                        }
+                    </TabsContent >
 
                     {/* Notes */}
-                    <TabsContent value="notes">
+                    < TabsContent value="notes" >
                         {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} />}
-                    </TabsContent>
+                    </TabsContent >
 
                     {/* Activity */}
-                    <TabsContent value="activity">
+                    < TabsContent value="activity" >
                         <ActivityTimeline
                             activities={activities}
                             contextDeals={deals.map(d => ({ id: d.id, name: (d.data as Record<string, string>)?.title || client?.name || 'Deal' }))}
                         />
-                    </TabsContent>
-                </div>
-            </Tabs>
+                    </TabsContent >
+                </div >
+            </Tabs >
 
             {
                 selectedDealId && (

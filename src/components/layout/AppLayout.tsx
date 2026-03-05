@@ -13,7 +13,7 @@ export default function AppLayout() {
                 <DynamicIslandNav />
 
                 {/* Main Content Area */}
-                <main className="flex-1 w-full h-full overflow-y-auto pt-24 pb-8 z-10 relative">
+                <main className="flex-1 w-full h-full overflow-y-auto pb-8 z-10 relative">
                     <div className="h-full w-full">
                         <Outlet />
                     </div>
