@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { fetchDealsByClient } from '@/lib/deals'
@@ -113,6 +113,8 @@ export default function ClientDetailPage() {
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleting, setDeleting] = useState(false)
 
     useEffect(() => {
         fetchClient()
@@ -235,6 +237,75 @@ export default function ClientDetailPage() {
             alert("Error invoking webhook.");
         } finally {
             setSyncingLinkedIn(false);
+        }
+    }
+
+    async function handleDeleteClient() {
+        if (!client) return
+        setDeleting(true)
+        try {
+            const dealIds = deals.map((d) => d.id)
+
+            // Delete deal storage files + attachments
+            if (dealIds.length > 0) {
+                const { data: attachmentRows } = await supabase
+                    .from('deal_attachments')
+                    .select('storage_path')
+                    .in('deal_id', dealIds)
+                const paths = (attachmentRows ?? []).map((a) => a.storage_path).filter(Boolean)
+                if (paths.length > 0) {
+                    await supabase.storage.from('deal-files').remove(paths)
+                }
+                await supabase.from('deal_attachments').delete().in('deal_id', dealIds)
+            }
+
+            // Find notes linked to client or its deals, then delete them
+            let orLinkQuery = `and(to_type.eq.client,to_id.eq.${client.id})`
+            if (dealIds.length > 0) {
+                orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
+            }
+            const { data: noteLinks } = await supabase
+                .from('links')
+                .select('from_id')
+                .eq('from_type', 'note')
+                .or(orLinkQuery)
+            if (noteLinks && noteLinks.length > 0) {
+                await supabase.from('notes').delete().in('id', noteLinks.map((l) => l.from_id))
+            }
+
+            // Find tasks linked to client or its deals, then delete them
+            const { data: taskLinks } = await supabase
+                .from('links')
+                .select('from_id')
+                .eq('from_type', 'task')
+                .or(orLinkQuery)
+            if (taskLinks && taskLinks.length > 0) {
+                await supabase.from('tasks').delete().in('id', taskLinks.map((l) => l.from_id))
+            }
+
+            // Delete activities
+            const activityOrChunks = [`and(entity_type.eq.client,entity_id.eq.${client.id})`]
+            if (dealIds.length > 0) {
+                activityOrChunks.push(`and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`)
+            }
+            await supabase.from('activities').delete().or(activityOrChunks.join(','))
+
+            // Delete links and deals
+            const allIds = [client.id, ...dealIds]
+            await supabase.from('links').delete().or(
+                allIds.map((id) => `from_id.eq.${id},to_id.eq.${id}`).join(',')
+            )
+            if (dealIds.length > 0) {
+                await supabase.from('deals').delete().in('id', dealIds)
+            }
+
+            // Delete the client
+            await supabase.from('clients').delete().eq('id', client.id)
+            navigate('/app/clients', { replace: true })
+        } catch (err) {
+            console.error('Failed to delete client', err)
+            setDeleting(false)
+            setConfirmDelete(false)
         }
     }
 
@@ -369,6 +440,38 @@ export default function ClientDetailPage() {
                                             >
                                                 <Edit2 size={14} />
                                             </Button>
+                                            {confirmDelete ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs text-destructive font-medium">Delete client?</span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={handleDeleteClient}
+                                                        disabled={deleting}
+                                                        className="h-7 px-2.5 text-xs"
+                                                    >
+                                                        {deleting ? 'Deleting…' : 'Yes, delete'}
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setConfirmDelete(false)}
+                                                        className="h-7 px-2.5 text-xs"
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => setConfirmDelete(true)}
+                                                    title="Delete client"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </Button>
+                                            )}
                                         </div>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
                                             {client.email && (

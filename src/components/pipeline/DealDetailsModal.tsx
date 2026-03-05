@@ -5,6 +5,7 @@ import {
     Banknote,
     Calendar,
     User,
+    Trash2,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -36,9 +37,10 @@ interface DealDetailsModalProps {
     dealId: string
     onClose: () => void
     onStageChange?: (dealId: string, newStage: DealStage) => void
+    onDeleted?: (dealId: string) => void
 }
 
-export default function DealDetailsModal({ dealId, onClose, onStageChange }: DealDetailsModalProps) {
+export default function DealDetailsModal({ dealId, onClose, onStageChange, onDeleted }: DealDetailsModalProps) {
     const { user } = useAuth()
 
     const [deal, setDeal] = useState<Deal | null>(null)
@@ -54,6 +56,8 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
     const [valueDraft, setValueDraft] = useState('')
     const [editingTitle, setEditingTitle] = useState(false)
     const [titleDraft, setTitleDraft] = useState('')
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleting, setDeleting] = useState(false)
 
     useEffect(() => {
         if (!user) return
@@ -140,6 +144,40 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
 
     function handleAttachmentDeleted(id: string) {
         setAttachments((prev) => prev.filter((a) => a.id !== id))
+    }
+
+    async function handleDelete() {
+        if (!deal) return
+        setDeleting(true)
+        try {
+            // Remove storage files
+            const storagePaths = attachments.map((a) => a.storage_path).filter(Boolean)
+            if (storagePaths.length > 0) {
+                await supabase.storage.from('deal-files').remove(storagePaths)
+            }
+            // Find notes linked to this deal and delete them
+            const { data: noteLinks } = await supabase
+                .from('links')
+                .select('from_id')
+                .eq('from_type', 'note')
+                .eq('to_type', 'deal')
+                .eq('to_id', deal.id)
+            if (noteLinks && noteLinks.length > 0) {
+                const noteIds = noteLinks.map((l) => l.from_id)
+                await supabase.from('notes').delete().in('id', noteIds)
+            }
+            // Delete related rows, then the deal itself
+            await supabase.from('deal_attachments').delete().eq('deal_id', deal.id)
+            await supabase.from('activities').delete().eq('entity_id', deal.id).eq('entity_type', 'deal')
+            await supabase.from('links').delete().or(`from_id.eq.${deal.id},to_id.eq.${deal.id}`)
+            await supabase.from('deals').delete().eq('id', deal.id)
+            onDeleted?.(deal.id)
+            onClose()
+        } catch (err) {
+            console.error('Failed to delete deal', err)
+            setDeleting(false)
+            setConfirmDelete(false)
+        }
     }
 
     const title = (deal?.data as Record<string, string>)?.title || deal?.client?.name || '—'
@@ -305,6 +343,33 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
                                             </>
                                         )}
                                     </div>
+
+                                    {confirmDelete ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[11px] text-destructive font-medium">Delete?</span>
+                                            <button
+                                                onClick={handleDelete}
+                                                disabled={deleting}
+                                                className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                                            >
+                                                {deleting ? 'Deleting…' : 'Yes'}
+                                            </button>
+                                            <button
+                                                onClick={() => setConfirmDelete(false)}
+                                                className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-muted hover:bg-muted/70 text-foreground transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setConfirmDelete(true)}
+                                            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground/40 hover:text-destructive transition-colors"
+                                            title="Delete deal"
+                                        >
+                                            <Trash2 size={14} strokeWidth={2} />
+                                        </button>
+                                    )}
 
                                     <button
                                         onClick={onClose}

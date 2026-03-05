@@ -14,6 +14,7 @@ interface KanbanColumnProps {
     attachmentCounts: AttachmentCounts
     onAddDeal: (stage: DealStage) => void
     onStageChange?: (dealId: string, newStage: DealStage) => void
+    onDealDeleted?: (dealId: string) => void
 }
 
 export default function KanbanColumn({
@@ -22,20 +23,21 @@ export default function KanbanColumn({
     attachmentCounts,
     onAddDeal,
     onStageChange,
+    onDealDeleted,
 }: KanbanColumnProps) {
     return (
         <div
-            className="flex flex-col bg-muted/50 rounded-xl p-3 min-w-[240px] w-64 shrink-0"
+            className="flex flex-col bg-muted/50 rounded-xl p-3 min-w-[280px] w-72 shrink-0"
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
             {/* Column header */}
             <div className="flex items-center justify-between mb-3 px-0.5">
                 <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-foreground/80 tracking-wide">
+                    <span className="text-sm font-medium text-foreground/80 tracking-wide">
                         {stage}
                     </span>
                     {deals.length > 0 && (
-                        <span className="text-[11px] text-muted-foreground/60 tabular-nums">
+                        <span className="text-xs text-muted-foreground/60 tabular-nums">
                             {deals.length}
                         </span>
                     )}
@@ -70,6 +72,7 @@ export default function KanbanColumn({
                                     proposalCount={counts.proposal}
                                     attachmentCount={counts.total}
                                     onStageChange={onStageChange}
+                                    onDeleted={onDealDeleted}
                                 />
                             )
                         })}
@@ -77,7 +80,7 @@ export default function KanbanColumn({
 
                         {deals.length === 0 && !snapshot.isDraggingOver && (
                             <div className="flex-1 flex items-center justify-center min-h-[80px]">
-                                <span className="text-[11px] text-muted-foreground/40">No deals</span>
+                                <span className="text-xs text-muted-foreground/40">No deals</span>
                             </div>
                         )}
                     </div>

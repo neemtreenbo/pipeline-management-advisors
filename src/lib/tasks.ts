@@ -52,28 +52,40 @@ export async function getTasks(options: GetTasksOptions) {
     // We can use an inner join with links table using PostgREST syntax if needed.
     // Let's implement that.
     if (options.clientId) {
-        // Find tasks linked to this client
-        // Since we can't easily do a subquery in supabase JS for dynamic entities compactly,
-        // we can fetch the link IDs first, or use a crafted query:
-        // supabase.from('tasks').select('*, links!inner(from_id)').eq('links.to_id', clientId)
-        // Wait, the links table structure: from_id, from_type, to_id, to_type.
-        // Task to Client link: from_type = 'task', from_id = task.id, to_type = 'client', to_id = clientId.
-        // Actually, without explicit foreign keys between links and tasks, Supabase JS inner join won't work easily.
-        // Let's fetch the task IDs from links.
-        const { data: linkData, error: linkError } = await supabase
+        // Fetch tasks linked directly to the client
+        const { data: clientLinkData, error: clientLinkError } = await supabase
             .from('links')
             .select('from_id')
             .eq('from_type', 'task')
             .eq('to_type', 'client')
             .eq('to_id', options.clientId)
 
-        if (linkError) throw linkError
-        const taskIds: string[] = linkData.map((l: { from_id: string }) => l.from_id)
+        if (clientLinkError) throw clientLinkError
 
-        if (taskIds.length === 0) {
-            // No tasks for this client
-            return []
+        // Also fetch tasks linked to any deal belonging to this client
+        const { data: clientDeals } = await supabase
+            .from('deals')
+            .select('id')
+            .eq('client_id', options.clientId)
+
+        const dealIds = (clientDeals ?? []).map((d: { id: string }) => d.id)
+        let dealTaskIds: string[] = []
+        if (dealIds.length > 0) {
+            const { data: dealLinkData } = await supabase
+                .from('links')
+                .select('from_id')
+                .eq('from_type', 'task')
+                .eq('to_type', 'deal')
+                .in('to_id', dealIds)
+            dealTaskIds = (dealLinkData ?? []).map((l: { from_id: string }) => l.from_id)
         }
+
+        const taskIds = Array.from(new Set([
+            ...clientLinkData.map((l: { from_id: string }) => l.from_id),
+            ...dealTaskIds,
+        ]))
+
+        if (taskIds.length === 0) return []
         query = query.in('id', taskIds)
     }
 

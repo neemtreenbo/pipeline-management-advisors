@@ -66,3 +66,14 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* BlockNote editor: match app background in dark mode */
+.dark .bn-container {
+  --mantine-color-dark-7: hsl(var(--background));
+  --mantine-color-dark-6: hsl(var(--background));
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .bn-editor {
+  background-color: hsl(var(--background)) !important;
+}

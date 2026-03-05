@@ -179,7 +179,7 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                                     {activity.entity_type === 'deal' && contextDeals && contextDeals.find(d => d.id === activity.entity_id) && (
                                         <div className="mt-1">
                                             <Link
-                                                to={`/app/deals/${activity.entity_id}`}
+                                                to={`/app/pipeline?deal=${activity.entity_id}`}
                                                 className="text-[11px] font-medium text-accent hover:underline flex items-center"
                                             >
                                                 → {contextDeals.find(d => d.id === activity.entity_id)?.name}

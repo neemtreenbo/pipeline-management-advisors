@@ -17,6 +17,8 @@ export default function NoteDetailPage() {
     const [loading, setLoading] = useState(true)
     const [title, setTitle] = useState('')
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | ''>('')
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleting, setDeleting] = useState(false)
 
     // Use refs for debounced saving to avoid stale closures
     const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -84,12 +86,15 @@ export default function NoteDetailPage() {
     }
 
     const handleDelete = async () => {
-        if (!noteId || !confirm('Are you sure you want to delete this note?')) return
+        if (!noteId) return
+        setDeleting(true)
         try {
             await deleteNote(noteId)
             navigate('/app/notes')
         } catch (err) {
             console.error('Failed to delete note', err)
+            setDeleting(false)
+            setConfirmDelete(false)
         }
     }
 
@@ -135,9 +140,38 @@ export default function NoteDetailPage() {
                         <Calendar size={12} />
                         <span>Last edited {new Date(note.updated_at).toLocaleString()}</span>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={handleDelete} className="text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20">
-                        <Trash2 size={16} />
-                    </Button>
+                    {confirmDelete ? (
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-destructive font-medium">Delete?</span>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="h-7 px-2.5 text-xs"
+                            >
+                                {deleting ? 'Deleting…' : 'Yes'}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setConfirmDelete(false)}
+                                className="h-7 px-2.5 text-xs"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirmDelete(true)}
+                            className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
+                            title="Delete note"
+                        >
+                            <Trash2 size={16} />
+                        </Button>
+                    )}
                 </div>
             </header>
 
