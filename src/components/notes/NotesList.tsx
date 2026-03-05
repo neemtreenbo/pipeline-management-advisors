@@ -5,11 +5,22 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getNotesLinkedToEntity, createNote, linkNoteToEntity, updateNote } from '@/lib/notes'
 import type { Note } from '@/lib/notes'
 
+type OptimisticActivity = {
+    id: string
+    event_type: string
+    entity_type?: string
+    entity_id?: string
+    data: Record<string, unknown>
+    created_at: string
+    actor_id: string
+}
+
 interface NotesListProps {
     entityType: string
     entityId: string
     orgId?: string
     inlineAdd?: boolean
+    onActivityAdded?: (activity: OptimisticActivity) => void
 }
 
 function extractPreview(content: any): string {
@@ -26,7 +37,7 @@ function makeParagraphContent(text: string) {
     return [{ type: 'paragraph', content: [{ type: 'text', text: text.trim() }] }]
 }
 
-export default function NotesList({ entityType, entityId, orgId, inlineAdd }: NotesListProps) {
+export default function NotesList({ entityType, entityId, orgId, inlineAdd, onActivityAdded }: NotesListProps) {
     const { user } = useAuth()
     const [notes, setNotes] = useState<Note[]>([])
     const [loading, setLoading] = useState(true)
@@ -73,6 +84,16 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd }: No
             const content = makeParagraphContent(addBody)
             const newNote = await createNote(orgId, user.id, addTitle.trim(), content)
             await linkNoteToEntity(newNote.id, entityType, entityId, orgId, user.id)
+            // Optimistic activity update
+            onActivityAdded?.({
+                id: `optimistic-note-${newNote.id}`,
+                event_type: 'note_created',
+                entity_type: 'note',
+                entity_id: newNote.id,
+                data: { title: newNote.title, note_id: newNote.id },
+                created_at: new Date().toISOString(),
+                actor_id: user.id,
+            })
             await loadNotes()
             setAdding(false)
             setAddTitle('')

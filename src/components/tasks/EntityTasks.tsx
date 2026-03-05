@@ -6,11 +6,22 @@ import { useAuth } from '@/contexts/AuthContext'
 import TaskList from './TaskList'
 import TaskDialog from './TaskDialog'
 
+type OptimisticActivity = {
+    id: string
+    event_type: string
+    entity_type?: string
+    entity_id?: string
+    data: Record<string, unknown>
+    created_at: string
+    actor_id: string
+}
+
 interface EntityTasksProps {
     orgId: string
     clientId?: string
     dealId?: string
     inlineAdd?: boolean
+    onActivityAdded?: (activity: OptimisticActivity) => void
 }
 
 function todayString() {
@@ -24,7 +35,7 @@ function toISO(dateStr: string) {
     return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
 }
 
-export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: EntityTasksProps) {
+export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActivityAdded }: EntityTasksProps) {
     const { user } = useAuth()
     const [tasks, setTasks] = useState<Task[]>([])
     const [loading, setLoading] = useState(true)
@@ -104,7 +115,17 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
             const links: { toId: string; toType: string }[] = []
             if (clientId) links.push({ toId: clientId, toType: 'client' })
             if (dealId) links.push({ toId: dealId, toType: 'deal' })
-            await createTask(taskInput, links)
+            const newTask = await createTask(taskInput, links)
+            // Optimistic activity update
+            onActivityAdded?.({
+                id: `optimistic-task-${newTask.id}`,
+                event_type: 'task_created',
+                entity_type: 'task',
+                entity_id: newTask.id,
+                data: { title: newTask.title },
+                created_at: new Date().toISOString(),
+                actor_id: user.id,
+            })
             await loadTasks()
             setAdding(false)
             setAddTitle('')

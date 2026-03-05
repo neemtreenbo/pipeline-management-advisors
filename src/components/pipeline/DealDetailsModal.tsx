@@ -419,7 +419,12 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                     {/* Tab content */}
                     <div className="overflow-y-auto px-6 py-5 flex-1">
                         {activeTab === 'tasks' && dealId && orgId && (
-                            <EntityTasks dealId={dealId} orgId={orgId} inlineAdd />
+                            <EntityTasks
+                                dealId={dealId}
+                                orgId={orgId}
+                                inlineAdd
+                                onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                            />
                         )}
                         {activeTab === 'proposals' && orgId && user && (
                             <ProposalUploader
@@ -433,7 +438,13 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                             />
                         )}
                         {activeTab === 'notes' && dealId && orgId && (
-                            <NotesList entityType="deal" entityId={dealId} orgId={orgId} inlineAdd />
+                            <NotesList
+                                entityType="deal"
+                                entityId={dealId}
+                                orgId={orgId}
+                                inlineAdd
+                                onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                            />
                         )}
                         {activeTab === 'activity' && (
                             <ActivityTimeline activities={activities} />

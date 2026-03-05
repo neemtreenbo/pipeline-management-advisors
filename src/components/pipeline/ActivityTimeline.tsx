@@ -1,13 +1,5 @@
-import {
-    CheckSquare,
-    ArrowRight,
-    Upload,
-    StickyNote,
-    Star,
-    Activity,
-} from 'lucide-react'
 import { Link } from 'react-router-dom'
-
+import { Activity } from 'lucide-react'
 
 interface ActivityRecord {
     id: string
@@ -24,75 +16,38 @@ interface ActivityTimelineProps {
     contextDeals?: { id: string; name: string }[]
 }
 
-const EVENT_CONFIG: Record<
-    string,
-    { icon: React.ReactNode; label: string; color: string }
-> = {
-    deal_created: {
-        icon: <Star size={14} />,
-        label: 'Deal created',
-        color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/30',
-    },
-    deal_stage_changed: {
-        icon: <ArrowRight size={14} />,
-        label: 'Stage updated',
-        color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/30',
-    },
-    proposal_uploaded: {
-        icon: <Upload size={14} />,
-        label: 'Proposal uploaded',
-        color: 'text-green-500 bg-green-50 dark:bg-green-900/30',
-    },
-    note_created: {
-        icon: <StickyNote size={14} />,
-        label: 'Note added',
-        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
-    },
-    note_linked: {
-        icon: <StickyNote size={14} />,
-        label: 'Note linked',
-        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
-    },
-    note_edited: {
-        icon: <StickyNote size={14} />,
-        label: 'Note edited',
-        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
-    },
-    task_created: {
-        icon: <CheckSquare size={14} />,
-        label: 'Task created',
-        color: 'text-muted-foreground bg-muted',
-    },
-    task_completed: {
-        icon: <CheckSquare size={14} />,
-        label: 'Task completed',
-        color: 'text-green-500 bg-green-50 dark:bg-green-900/30',
-    },
-    task_uncompleted: {
-        icon: <CheckSquare size={14} />,
-        label: 'Task reopened',
-        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
-    },
+const EVENT_LABELS: Record<string, string> = {
+    deal_created: 'Deal created',
+    deal_stage_changed: 'Stage changed',
+    proposal_uploaded: 'Proposal uploaded',
+    note_created: 'Note added',
+    note_linked: 'Note linked',
+    note_edited: 'Note edited',
+    task_created: 'Task added',
+    task_completed: 'Task completed',
+    task_uncompleted: 'Task reopened',
 }
 
-function getEventConfig(eventType: string) {
-    return (
-        EVENT_CONFIG[eventType] ?? {
-            icon: <Activity size={14} />,
-            label: eventType.replace(/_/g, ' '),
-            color: 'text-muted-foreground bg-muted',
-        }
-    )
+function getLabel(eventType: string) {
+    return EVENT_LABELS[eventType] ?? eventType.replace(/_/g, ' ')
 }
 
-function getEventDescription(activity: ActivityRecord): React.ReactNode {
+function getDetail(activity: ActivityRecord): React.ReactNode {
     const d = activity.data
 
     switch (activity.event_type) {
+        case 'deal_created':
+            return d.title ? `"${d.title as string}"` : null
         case 'deal_stage_changed':
-            return `Moved to ${d.to_stage as string}`
+            return (
+                <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground/60">{d.from_stage as string}</span>
+                    <span className="text-muted-foreground/30">→</span>
+                    <span className="text-foreground/70 font-medium">{d.to_stage as string}</span>
+                </span>
+            )
         case 'proposal_uploaded':
-            return `"${d.file_name as string}"`
+            return d.file_name ? (d.file_name as string) : null
         case 'note_created':
         case 'note_linked':
         case 'note_edited':
@@ -100,24 +55,23 @@ function getEventDescription(activity: ActivityRecord): React.ReactNode {
                 return (
                     <Link
                         to={`/app/notes/${d.note_id as string}`}
-                        className="font-medium text-accent hover:underline"
+                        className="text-accent hover:underline underline-offset-2"
                     >
-                        {(d.title as string) ?? 'Note'}
+                        {(d.title as string) || 'Untitled note'}
                     </Link>
                 )
             }
-            return (d.title as string) ?? 'Note'
+            return (d.title as string) || null
         case 'task_created':
-            return (d.title as string) ?? 'Task'
         case 'task_completed':
         case 'task_uncompleted':
-            return (d.title as string) ?? 'Task'
+            return (d.title as string) || null
         default:
-            return ''
+            return null
     }
 }
 
-function timeAgo(dateStr: string): string {
+function formatTime(dateStr: string): string {
     const now = new Date()
     const date = new Date(dateStr)
     const diffMs = now.getTime() - date.getTime()
@@ -133,12 +87,28 @@ function timeAgo(dateStr: string): string {
     return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
 
+function formatAbsolute(dateStr: string): string {
+    return new Date(dateStr).toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    })
+}
+
+function getDotStyle(eventType: string): string {
+    if (eventType === 'task_completed') return 'bg-foreground/50'
+    if (eventType === 'deal_stage_changed') return 'bg-foreground/70'
+    if (eventType === 'proposal_uploaded') return 'bg-foreground/60'
+    return 'bg-border'
+}
+
 export default function ActivityTimeline({ activities, contextDeals }: ActivityTimelineProps) {
     if (activities.length === 0) {
         return (
-            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-                <Activity size={16} />
-                No activity yet.
+            <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+                <Activity size={18} className="text-muted-foreground/30" />
+                <p className="text-[13px] text-muted-foreground/40">No activity yet</p>
             </div>
         )
     }
@@ -146,50 +116,65 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
     return (
         <div className="flex flex-col">
             {activities.map((activity, idx) => {
-                const config = getEventConfig(activity.event_type)
-                const description = getEventDescription(activity)
+                const detail = getDetail(activity)
                 const isLast = idx === activities.length - 1
+                const dealContext = contextDeals?.find(d => d.id === activity.entity_id)
+                const isDealActivity = activity.entity_type === 'deal' && !!dealContext
 
                 return (
-                    <div
-                        key={activity.id}
-                        className="flex gap-3"
-                        id={`activity-${activity.id}`}
-                    >
-                        {/* Timeline line + dot */}
-                        <div className="flex flex-col items-center">
-                            <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${config.color}`}
-                            >
-                                {config.icon}
-                            </div>
-                            {!isLast && <div className="w-px flex-1 bg-border mt-1 mb-1" />}
+                    <div key={activity.id} className="flex gap-3">
+                        {/* Dot + line */}
+                        <div className="flex flex-col items-center pt-[5px]">
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getDotStyle(activity.event_type)}`} />
+                            {!isLast && <div className="w-px flex-1 bg-border/50 mt-2 mb-1" />}
                         </div>
 
                         {/* Content */}
-                        <div className={`flex-1 pb-4 ${isLast ? '' : ''}`}>
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <p className="text-sm font-medium text-foreground">{config.label}</p>
-                                    {description && (
-                                        <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">
-                                            {description}
-                                        </p>
-                                    )}
-                                    {activity.entity_type === 'deal' && contextDeals && contextDeals.find(d => d.id === activity.entity_id) && (
-                                        <div className="mt-1">
+                        <div className={`flex-1 min-w-0 ${isLast ? 'pb-1' : 'pb-4'}`}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+
+                                    {isDealActivity ? (
+                                        // Client context: deal name is the primary anchor, event is secondary
+                                        <>
                                             <Link
                                                 to={`/app/pipeline?deal=${activity.entity_id}`}
-                                                className="text-[11px] font-medium text-accent hover:underline flex items-center"
+                                                className="text-[13px] font-medium text-foreground/80 hover:text-accent transition-colors duration-150 leading-snug truncate block"
                                             >
-                                                → {contextDeals.find(d => d.id === activity.entity_id)?.name}
+                                                {dealContext!.name}
                                             </Link>
-                                        </div>
+                                            <p className="text-[12px] text-muted-foreground/60 mt-0.5 leading-snug">
+                                                {getLabel(activity.event_type)}
+                                                {detail && (
+                                                    <>
+                                                        <span className="mx-1 text-muted-foreground/30">·</span>
+                                                        <span className="text-[12px]">{detail}</span>
+                                                    </>
+                                                )}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        // Deal modal context or non-deal activity: event label is primary
+                                        <>
+                                            <p className="text-[13px] font-medium text-foreground/80 leading-snug">
+                                                {getLabel(activity.event_type)}
+                                            </p>
+                                            {detail && (
+                                                <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+                                                    {detail}
+                                                </p>
+                                            )}
+                                        </>
                                     )}
+
                                 </div>
-                                <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
-                                    {timeAgo(activity.created_at)}
-                                </span>
+
+                                <time
+                                    className="text-[11px] text-muted-foreground/40 shrink-0 tabular-nums mt-0.5"
+                                    title={formatAbsolute(activity.created_at)}
+                                >
+                                    {formatTime(activity.created_at)}
+                                </time>
                             </div>
                         </div>
                     </div>
