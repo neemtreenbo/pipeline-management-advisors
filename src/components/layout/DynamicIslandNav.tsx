@@ -54,11 +54,11 @@ const [hoveredPath, setHoveredPath] = useState<string | null>(null)
                 <DropdownMenu.Root>
                     <DropdownMenu.Trigger asChild>
                         <motion.button layout className="flex items-center pl-2 pr-2 sm:pr-4 py-1 shrink-0 group focus:outline-none">
-                            <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-[0_4px_12px_rgba(37,99,235,0.3)] transition-shadow group-hover:shadow-[0_4px_16px_rgba(37,99,235,0.4)]">
+                            <div className="w-8 h-8 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-foreground flex items-center justify-center transition-opacity group-hover:opacity-80">
                                 {avatarUrl ? (
                                     <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <span className="text-white font-bold text-sm leading-none tracking-tighter shadow-sm">
+                                    <span className="text-background font-semibold text-sm leading-none">
                                         {userInitial}
                                     </span>
                                 )}
@@ -143,7 +143,7 @@ const [hoveredPath, setHoveredPath] = useState<string | null>(null)
                                 className={`relative flex items-center gap-2 rounded-full text-sm font-medium z-10 transition-colors duration-200
                                     ${isMobile ? 'px-3 py-3' : 'px-4 py-2.5'}
                                     ${isActive
-                                        ? 'text-accent'
+                                        ? 'text-foreground'
                                         : isHovered
                                             ? 'text-foreground'
                                             : 'text-muted-foreground'
@@ -153,7 +153,7 @@ const [hoveredPath, setHoveredPath] = useState<string | null>(null)
                                 {isActive && (
                                     <motion.div
                                         layoutId="active-pill"
-                                        className="absolute inset-0 bg-accent/10 rounded-full -z-10 shadow-[inner_0_1px_2px_rgba(0,0,0,0.02)] border border-accent/20"
+                                        className="absolute inset-0 bg-muted rounded-full -z-10 border border-border"
                                         initial={false}
                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                     />

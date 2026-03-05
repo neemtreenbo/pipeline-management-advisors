@@ -37,13 +37,9 @@ const SOURCE_OPTIONS = [
     { value: 'other', label: 'Other' },
 ]
 
-const SOURCE_COLORS: Record<string, string> = {
-    referral: 'bg-muted text-muted-foreground border-border',
-    walk_in: 'bg-muted text-muted-foreground border-border',
-    social_media: 'bg-muted text-muted-foreground border-border',
-    cold_call: 'bg-muted text-muted-foreground border-border',
-    event: 'bg-muted text-muted-foreground border-border',
-    other: 'bg-muted text-muted-foreground border-border',
+function formatDate(dateStr: string) {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function getInitials(name: string) {
@@ -190,7 +186,7 @@ const [clients, setClients] = useState<Client[]>([])
 
         if (field === 'source') {
             return (
-                <div className="relative group/cell">
+                <div className="relative">
                     {isEditing ? (
                         <select
                             autoFocus
@@ -198,7 +194,7 @@ const [clients, setClients] = useState<Client[]>([])
                             onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : prev)}
                             onBlur={saveInlineEdit}
                             onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null) }}
-                            className="w-full text-sm bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                            className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                         >
                             {SOURCE_OPTIONS.map(o => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -206,10 +202,10 @@ const [clients, setClients] = useState<Client[]>([])
                         </select>
                     ) : (
                         <div
-                            className="cursor-pointer rounded-md px-2 py-1 -mx-2 hover:bg-muted/50 transition-colors group/cell min-h-[28px] flex items-center"
+                            className="cursor-pointer rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
                             onClick={() => startEdit(client, field)}
                         >
-                            {display || <span className="text-muted-foreground/40 text-xs">{placeholder}</span>}
+                            {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
                         </div>
                     )}
                 </div>
@@ -217,7 +213,7 @@ const [clients, setClients] = useState<Client[]>([])
         }
 
         return (
-            <div className="relative group/cell">
+            <div className="relative">
                 {isEditing ? (
                     <input
                         ref={inlineInputRef}
@@ -229,14 +225,14 @@ const [clients, setClients] = useState<Client[]>([])
                             if (e.key === 'Escape') setInlineEdit(null)
                         }}
                         placeholder={placeholder}
-                        className="w-full text-sm bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                        className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                     />
                 ) : (
                     <div
-                        className="cursor-text rounded-md px-2 py-1 -mx-2 hover:bg-muted/50 transition-colors min-h-[28px] flex items-center"
+                        className="cursor-text rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
                         onClick={() => startEdit(client, field)}
                     >
-                        {display || <span className="text-muted-foreground/30 text-xs">{placeholder}</span>}
+                        {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
                     </div>
                 )}
             </div>
@@ -249,43 +245,54 @@ const [clients, setClients] = useState<Client[]>([])
         <div className="min-h-screen bg-transparent pt-6">
             <div className="max-w-5xl mx-auto px-6 pb-8">
                 <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-lg font-semibold text-foreground">Clients</h1>
+                    <div>
+                        <h1 className="text-lg font-semibold text-foreground">Clients</h1>
+                        {!loading && sorted.length > 0 && (
+                            <p className="text-[12px] text-muted-foreground/50 mt-0.5">{sorted.length} {sorted.length === 1 ? 'client' : 'clients'}</p>
+                        )}
+                    </div>
                     <Button onClick={startAddingNew} className="h-8 text-xs rounded-full px-3 font-medium">
                         <Plus size={14} className="mr-1.5" /> Add
                     </Button>
                 </div>
                 {loading ? (
-                    <div className="flex flex-col gap-2">
-                        {[...Array(8)].map((_, i) => (
-                            <div key={i} className="h-12 rounded-xl bg-muted/50 animate-pulse" />
+                    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className={`flex items-center gap-3 px-5 py-3.5 ${i < 5 ? 'border-b border-border/40' : ''}`}>
+                                <div className="w-7 h-7 rounded-full bg-muted animate-pulse shrink-0" />
+                                <div className="h-3.5 bg-muted animate-pulse rounded w-32" />
+                                <div className="ml-auto h-3 bg-muted animate-pulse rounded w-16 opacity-50" />
+                            </div>
                         ))}
                     </div>
                 ) : !showTable ? (
                     <div className="flex flex-col items-center justify-center py-28 text-center">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                            <Plus size={20} className="text-muted-foreground" />
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-4">
+                            <Plus size={18} className="text-muted-foreground/60" />
                         </div>
                         <p className="text-sm font-medium text-foreground mb-1">No clients yet</p>
-                        <p className="text-sm text-muted-foreground mb-6">Click "Add" to get started.</p>
+                        <p className="text-[13px] text-muted-foreground/60 mb-6">Add your first client to get started.</p>
                         <Button onClick={startAddingNew} className="rounded-xl shadow-none">
-                            <Plus size={15} /> Add your first client
+                            <Plus size={14} /> Add client
                         </Button>
                     </div>
                 ) : (
-                    <div className="rounded-2xl border border-border bg-card shadow-sm flex flex-col">
+                    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
                         {/* Table header */}
-                        <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 border-b border-border bg-muted/95 backdrop-blur-sm px-5 py-2.5 sticky top-0 z-10 rounded-t-2xl">
+                        <div className="grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-2.5 border-b border-border/60 bg-muted/40">
                             {[
                                 { field: 'name', label: 'Name' },
                                 { field: 'source', label: 'Source' },
                                 { field: 'email', label: 'Email' },
                                 { field: 'phone', label: 'Phone' },
+                                { field: null, label: 'Added' },
                             ].map(({ field, label }) => {
-                                const isActive = sortField === field;
+                                const isActive = field && sortField === field;
                                 return (
                                     <button
-                                        key={field}
+                                        key={label}
                                         onClick={() => {
+                                            if (!field) return
                                             if (isActive) {
                                                 setSortDir(d => d === 'asc' ? 'desc' : 'asc')
                                             } else {
@@ -293,14 +300,14 @@ const [clients, setClients] = useState<Client[]>([])
                                                 setSortDir('asc')
                                             }
                                         }}
-                                        className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors text-left w-fit"
+                                        className={`flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider text-left w-fit transition-colors duration-150 ${field ? 'hover:text-muted-foreground cursor-pointer' : 'cursor-default'}`}
                                     >
                                         {label}
-                                        {isActive ? (
-                                            sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                                        {field && (isActive ? (
+                                            sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
                                         ) : (
-                                            <ArrowUpDown size={12} className="opacity-50" />
-                                        )}
+                                            <ArrowUpDown size={11} className="opacity-40" />
+                                        ))}
                                     </button>
                                 )
                             })}
@@ -309,11 +316,11 @@ const [clients, setClients] = useState<Client[]>([])
                         <div className="flex flex-col">
                             {/* New inline row */}
                             {addingNew && (
-                                <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 px-5 py-2.5 items-center border-b border-border bg-muted/30">
+                                <div className="grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-3 items-center border-b border-border/40 bg-muted/20">
                                     {/* Name */}
                                     <div className="pr-4 flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
-                                            <span className="text-[11px] font-medium text-muted-foreground/50">—</span>
+                                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                            <span className="text-[10px] text-muted-foreground/40">—</span>
                                         </div>
                                         <input
                                             ref={newNameRef}
@@ -325,7 +332,7 @@ const [clients, setClients] = useState<Client[]>([])
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-source')?.focus() }
                                             }}
                                             placeholder="Full name"
-                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/30"
                                         />
                                     </div>
 
@@ -339,7 +346,7 @@ const [clients, setClients] = useState<Client[]>([])
                                                 if (e.key === 'Escape') cancelAddingNew()
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-email')?.focus() }
                                             }}
-                                            className="w-full text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all text-muted-foreground"
+                                            className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all text-muted-foreground"
                                         >
                                             {SOURCE_OPTIONS.map(o => (
                                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -360,12 +367,12 @@ const [clients, setClients] = useState<Client[]>([])
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-phone')?.focus() }
                                             }}
                                             placeholder="Email"
-                                            className="w-full text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/40"
+                                            className="w-full text-[13px] bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/30"
                                         />
                                     </div>
 
-                                    {/* Phone + actions */}
-                                    <div className="flex items-center gap-2">
+                                    {/* Phone */}
+                                    <div className="pr-3">
                                         <input
                                             id="new-phone"
                                             value={newRow.phone}
@@ -375,20 +382,24 @@ const [clients, setClients] = useState<Client[]>([])
                                                 if (e.key === 'Escape') cancelAddingNew()
                                             }}
                                             placeholder="Phone"
-                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                            className="w-full text-[13px] bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/30"
                                         />
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={saveNewRow}
                                             disabled={!newRow.name.trim() || newRowSaving}
-                                            className="shrink-0 w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                            className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors duration-150 disabled:opacity-25 disabled:cursor-not-allowed"
                                         >
-                                            <Check size={13} strokeWidth={2.5} />
+                                            <Check size={12} strokeWidth={2.5} />
                                         </button>
                                         <button
                                             onClick={cancelAddingNew}
-                                            className="shrink-0 w-7 h-7 rounded-full bg-muted border border-border text-muted-foreground flex items-center justify-center hover:bg-muted/70 transition-colors"
+                                            className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-muted/70 transition-colors duration-150"
                                         >
-                                            <X size={13} strokeWidth={2.5} />
+                                            <X size={12} strokeWidth={2.5} />
                                         </button>
                                     </div>
                                 </div>
@@ -397,21 +408,21 @@ const [clients, setClients] = useState<Client[]>([])
                             {sorted.map((client, idx) => (
                                 <div
                                     key={client.id}
-                                    className={`grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 px-5 py-3 items-center ${idx < sorted.length - 1 ? 'border-b border-border/50' : ''} hover:bg-muted/40 hover:-translate-y-1 hover:shadow-md hover:scale-[1.005] hover:z-10 relative transition-all duration-150 group`}
+                                    className={`grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-3.5 items-center ${idx < sorted.length - 1 ? 'border-b border-border/40' : ''} hover:bg-muted/40 hover:-translate-y-px hover:shadow-sm hover:z-10 relative transition-all duration-150 group`}
                                 >
-                                    {/* Name */}
+                                    {/* Name — click navigates */}
                                     <div
                                         className="min-w-0 pr-4 flex items-center gap-3 cursor-pointer"
                                         onClick={() => navigate(`/app/clients/${client.id}`)}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                                             {client.profile_picture_url ? (
                                                 <img src={client.profile_picture_url} alt={client.name} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="text-xs font-bold text-primary">{getInitials(client.name)}</span>
+                                                <span className="text-[11px] font-medium text-muted-foreground/70">{getInitials(client.name)}</span>
                                             )}
                                         </div>
-                                        <span className="text-sm font-medium text-foreground truncate">{client.name}</span>
+                                        <span className="text-[13px] font-medium text-foreground truncate group-hover:text-foreground/90 transition-colors">{client.name}</span>
                                     </div>
 
                                     {/* Source */}
@@ -421,12 +432,12 @@ const [clients, setClients] = useState<Client[]>([])
                                             field="source"
                                             display={
                                                 client.source ? (
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border capitalize ${SOURCE_COLORS[client.source] ?? 'bg-muted text-muted-foreground border-border'}`}>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[11px] text-muted-foreground capitalize">
                                                         {formatSource(client.source)}
                                                     </span>
                                                 ) : null
                                             }
-                                            placeholder="Add source"
+                                            placeholder="—"
                                         />
                                     </div>
 
@@ -437,13 +448,13 @@ const [clients, setClients] = useState<Client[]>([])
                                             field="email"
                                             display={
                                                 client.email ? (
-                                                    <span className="flex items-center gap-1.5 text-sm text-foreground truncate">
-                                                        <Mail size={12} className="text-muted-foreground shrink-0" />
-                                                        <span className="truncate">{client.email}</span>
+                                                    <span className="flex items-center gap-1.5 min-w-0">
+                                                        <Mail size={11} className="text-muted-foreground/50 shrink-0" />
+                                                        <span className="text-[13px] text-foreground/80 truncate">{client.email}</span>
                                                     </span>
                                                 ) : null
                                             }
-                                            placeholder="Add email"
+                                            placeholder="—"
                                         />
                                     </div>
 
@@ -454,14 +465,19 @@ const [clients, setClients] = useState<Client[]>([])
                                             field="phone"
                                             display={
                                                 client.phone ? (
-                                                    <span className="flex items-center gap-1.5 text-sm text-foreground">
-                                                        <Phone size={12} className="text-muted-foreground shrink-0" />
-                                                        {client.phone}
+                                                    <span className="flex items-center gap-1.5">
+                                                        <Phone size={11} className="text-muted-foreground/50 shrink-0" />
+                                                        <span className="text-[13px] text-foreground/80">{client.phone}</span>
                                                     </span>
                                                 ) : null
                                             }
-                                            placeholder="Add phone"
+                                            placeholder="—"
                                         />
+                                    </div>
+
+                                    {/* Added date */}
+                                    <div className="text-[12px] text-muted-foreground/40 tabular-nums">
+                                        {formatDate(client.created_at)}
                                     </div>
                                 </div>
                             ))}
