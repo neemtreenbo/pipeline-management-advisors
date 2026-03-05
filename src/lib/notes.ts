@@ -322,6 +322,7 @@ export type NoteClientInfo = {
     noteId: string
     clientId: string
     clientName: string
+    profilePictureUrl: string | null
 }
 
 export async function getClientsForNotes(noteIds: string[]): Promise<NoteClientInfo[]> {
@@ -377,21 +378,22 @@ export async function getClientsForNotes(noteIds: string[]): Promise<NoteClientI
 
     const { data: clients } = await supabase
         .from('clients')
-        .select('id, name')
+        .select('id, name, profile_picture_url')
         .in('id', Array.from(clientIdsToFetch))
 
     if (!clients) return []
 
-    const clientNameMap = new Map(clients.map(c => [c.id, c.name]))
+    const clientMap = new Map(clients.map(c => [c.id, c]))
 
     const results: NoteClientInfo[] = []
     for (const [noteId, clientId] of noteToClientMap.entries()) {
-        const name = clientNameMap.get(clientId)
-        if (name) {
+        const client = clientMap.get(clientId)
+        if (client) {
             results.push({
                 noteId,
                 clientId,
-                clientName: name
+                clientName: client.name,
+                profilePictureUrl: client.profile_picture_url ?? null
             })
         }
     }

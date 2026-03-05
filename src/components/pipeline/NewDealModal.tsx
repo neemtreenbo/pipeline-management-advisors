@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { X, Briefcase } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { PIPELINE_STAGES } from '@/lib/deals'
+import { supabase } from '@/lib/supabase'
 import type { DealStage, NewDealInput } from '@/lib/deals'
-
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import ClientSelector from '@/components/ui/ClientSelector'
 
 const FINANCIAL_PLAN_TYPES = [
@@ -29,146 +28,157 @@ interface NewDealModalProps {
 
 export default function NewDealModal({ orgId, defaultStage = 'Opportunity', onClose, onCreated }: NewDealModalProps) {
     const { user } = useAuth()
-    const [form, setForm] = useState({
-        client_id: '',
-        title: '',
-        stage: defaultStage,
-    })
+    const [form, setForm] = useState({ client_id: '', title: '' })
+    const [selectedClient, setSelectedClient] = useState<{ name: string; avatarUrl: string | null } | null>(null)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    async function handleClientChange(clientId: string, clientName: string) {
+        setForm(f => ({ ...f, client_id: clientId }))
+        if (!clientId) { setSelectedClient(null); return }
+        const { data } = await supabase.from('clients').select('profile_picture_url').eq('id', clientId).single()
+        setSelectedClient({ name: clientName, avatarUrl: data?.profile_picture_url ?? null })
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         if (!user) return
         if (!form.client_id) { setError('Please select a client.'); return }
-
         setSaving(true)
         setError(null)
-
         const input: NewDealInput = {
             org_id: orgId,
             client_id: form.client_id,
             owner_id: user.id,
-            stage: form.stage,
+            stage: defaultStage,
             value: 0,
             expected_close_date: null,
             title: form.title.trim() || undefined,
         }
-
         onCreated(input)
         setSaving(false)
     }
 
     return (
         <>
-            {/* Overlay */}
-            <div
-                className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm"
-                onClick={onClose}
-            />
+            <div className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm" onClick={onClose} />
 
-            {/* Modal */}
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-                <div className="bg-white rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] w-full max-w-lg flex flex-col overflow-hidden border border-black/[0.04]">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+                <div className="bg-white rounded-2xl shadow-[0_16px_48px_-12px_rgba(0,0,0,0.18)] w-full max-w-xl flex flex-col overflow-hidden border border-black/[0.06] pointer-events-auto">
+
                     {/* Header */}
-                    <div className="flex items-center justify-between px-8 py-6 pb-2">
-                        <div className="space-y-1">
-                            <h2 className="text-xl font-semibold tracking-tight text-foreground">New Deal</h2>
-                            <p className="text-sm text-muted-foreground">Add a new opportunity to your pipeline</p>
+                    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-border/60">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                {selectedClient ? (
+                                    selectedClient.avatarUrl ? (
+                                        <img src={selectedClient.avatarUrl} alt={selectedClient.name} className="w-9 h-9 rounded-full object-cover border border-border/40 shrink-0" />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center border border-border/40 shrink-0">
+                                            <span className="text-[13px] font-medium text-muted-foreground">
+                                                {selectedClient.name.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                    )
+                                ) : (
+                                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                        <Briefcase size={15} className="text-muted-foreground/70" />
+                                    </div>
+                                )}
+                                <div>
+                                    <h2 className="text-[15px] font-semibold text-foreground leading-tight">
+                                        {selectedClient ? selectedClient.name : 'New Deal'}
+                                    </h2>
+                                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                                        {selectedClient ? 'New opportunity' : 'Add a new opportunity to your pipeline'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={onClose}
+                                className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground/50 hover:text-foreground transition-colors mt-0.5"
+                            >
+                                <X size={15} strokeWidth={2} />
+                            </button>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 -mr-2 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors self-start"
-                        >
-                            <X size={18} strokeWidth={2.5} />
-                        </button>
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4 flex flex-col gap-6">
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-6 py-5">
+
                         {/* Client */}
-                        <div className="flex flex-col gap-2 relative">
-                            <Label htmlFor="deal-client-search" className="text-sm font-medium text-foreground/80">Client</Label>
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Client</span>
                             <ClientSelector
                                 orgId={orgId}
                                 value={form.client_id}
-                                onChange={(clientId) => setForm((f) => ({ ...f, client_id: clientId }))}
+                                onChange={handleClientChange}
                             />
                         </div>
 
                         {/* Deal title */}
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="deal-title" className="text-sm font-medium text-foreground/80">Deal Title</Label>
-                            <div className="flex flex-wrap gap-2 pb-1">
-                                {FINANCIAL_PLAN_TYPES.map((plan) => (
-                                    <button
-                                        key={plan}
-                                        type="button"
-                                        onClick={() => {
-                                            setForm((f) => ({ ...f, title: plan }))
-                                            setTimeout(() => {
-                                                const el = document.getElementById('deal-title') as HTMLInputElement
-                                                if (el) {
-                                                    el.focus()
-                                                }
-                                            }, 0)
-                                        }}
-                                        className={`px-3 py-1.5 text-[13px] rounded-lg border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${form.title.includes(plan)
-                                            ? 'bg-primary/5 text-primary border-primary/30 font-medium shadow-sm ring-1 ring-primary/10'
-                                            : 'bg-transparent text-muted-foreground border-border/60 hover:border-border hover:bg-muted/30 hover:text-foreground hover:shadow-sm'
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Plan Type</span>
+                            <div className="flex flex-wrap gap-1.5 mb-1">
+                                {FINANCIAL_PLAN_TYPES.map((plan) => {
+                                    const isSelected = form.title === plan
+                                    return (
+                                        <motion.button
+                                            key={plan}
+                                            type="button"
+                                            onClick={() => {
+                                                setForm((f) => ({ ...f, title: plan }))
+                                                setTimeout(() => {
+                                                    const el = document.getElementById('deal-title') as HTMLInputElement
+                                                    if (el) el.focus()
+                                                }, 0)
+                                            }}
+                                            whileHover={isSelected ? {} : { y: -2, scale: 1.04, boxShadow: '0 4px 12px rgba(0,0,0,0.10)' }}
+                                            whileTap={{ scale: 0.96, y: 0 }}
+                                            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                                            className={`px-2.5 py-1 text-[12px] rounded-lg border ${
+                                                isSelected
+                                                    ? 'bg-foreground text-background border-foreground font-medium shadow-md'
+                                                    : 'bg-white text-muted-foreground border-border/60 hover:border-border hover:text-foreground'
                                             }`}
-                                    >
-                                        {plan}
-                                    </button>
-                                ))}
+                                        >
+                                            {plan}
+                                        </motion.button>
+                                    )
+                                })}
                             </div>
                             <Input
                                 id="deal-title"
-                                placeholder="Choose a plan above or type a custom title..."
+                                placeholder="Or type a custom title…"
                                 value={form.title}
                                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                                className="h-11 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none"
+                                className="h-9 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white text-sm shadow-none"
                             />
                         </div>
 
-                        {/* Stage */}
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="deal-stage" className="text-sm font-medium text-foreground/80">Pipeline Stage</Label>
-                            <select
-                                id="deal-stage"
-                                value={form.stage}
-                                onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value as DealStage }))}
-                                className="flex h-11 w-full rounded-xl border border-muted-foreground/10 bg-muted/30 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none"
-                            >
-                                {PIPELINE_STAGES.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Value */}
-                        {error && (
-                            <p className="text-sm text-destructive bg-red-50/50 border border-red-100 rounded-xl px-4 py-3">
+{error && (
+                            <p className="text-[12px] text-destructive bg-red-50/50 border border-red-100 rounded-xl px-3 py-2">
                                 {error}
                             </p>
                         )}
 
-                        <div className="flex gap-3 pt-6 mt-2 border-t border-border/40">
+                        {/* Footer */}
+                        <div className="flex gap-2 pt-1 mt-1 border-t border-border/40">
                             <Button
                                 type="button"
                                 variant="secondary"
-                                className="flex-1 h-11 rounded-xl shadow-none font-medium text-muted-foreground hover:bg-muted/50 border-muted-foreground/20"
+                                className="flex-1 h-9 rounded-xl shadow-none text-sm text-muted-foreground"
                                 onClick={onClose}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1 h-11 rounded-xl shadow-none font-medium"
+                                className="flex-1 h-9 rounded-xl shadow-none text-sm font-medium"
                                 disabled={saving}
                                 id="save-deal-btn"
                             >
-                                {saving ? 'Creating Deal...' : 'Create Deal'}
+                                {saving ? 'Creating…' : 'Create Deal'}
                             </Button>
                         </div>
                     </form>

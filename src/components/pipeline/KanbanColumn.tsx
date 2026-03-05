@@ -13,6 +13,7 @@ interface KanbanColumnProps {
     deals: Deal[]
     attachmentCounts: AttachmentCounts
     onAddDeal: (stage: DealStage) => void
+    onStageChange?: (dealId: string, newStage: DealStage) => void
 }
 
 export default function KanbanColumn({
@@ -20,6 +21,7 @@ export default function KanbanColumn({
     deals,
     attachmentCounts,
     onAddDeal,
+    onStageChange,
 }: KanbanColumnProps) {
     return (
         <div
@@ -67,6 +69,7 @@ export default function KanbanColumn({
                                     index={index}
                                     proposalCount={counts.proposal}
                                     attachmentCount={counts.total}
+                                    onStageChange={onStageChange}
                                 />
                             )
                         })}

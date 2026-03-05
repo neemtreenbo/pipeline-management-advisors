@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Plus, Search, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
@@ -14,7 +14,25 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function ClientNoteGroup({ clientId, clientName, notes }: { clientId: string, clientName: string, notes: Note[] }) {
+function extractTextFromContent(content: any): string {
+    if (!content || !Array.isArray(content)) return ''
+    const texts: string[] = []
+    for (const block of content) {
+        if (Array.isArray(block.content)) {
+            for (const inline of block.content) {
+                if (inline.type === 'text' && inline.text) texts.push(inline.text)
+            }
+        }
+        if (Array.isArray(block.children)) {
+            const childText = extractTextFromContent(block.children)
+            if (childText) texts.push(childText)
+        }
+        if (texts.join(' ').length > 200) break
+    }
+    return texts.join(' ').trim()
+}
+
+function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[] }) {
     const [isExpanded, setIsExpanded] = useState(true)
 
     return (
@@ -26,9 +44,13 @@ function ClientNoteGroup({ clientId, clientName, notes }: { clientId: string, cl
                 {isExpanded ? <ChevronDown size={18} className="text-muted-foreground shrink-0" /> : <ChevronRight size={18} className="text-muted-foreground shrink-0" />}
                 <div className="flex items-center gap-2">
                     {clientId !== 'unassigned' && (
-                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-[10px] font-bold text-primary">{getInitials(clientName)}</span>
-                        </div>
+                        profilePictureUrl ? (
+                            <img src={profilePictureUrl} alt={clientName} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                        ) : (
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-[10px] font-bold text-primary">{getInitials(clientName)}</span>
+                            </div>
+                        )
                     )}
                     <h2 className="text-lg font-semibold text-foreground">{clientName}</h2>
                     <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{notes.length}</span>
@@ -37,38 +59,33 @@ function ClientNoteGroup({ clientId, clientName, notes }: { clientId: string, cl
 
             {isExpanded && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
-                    {notes.map((note) => (
-                        <Link
-                            key={note.id}
-                            to={`/app/notes/${note.id}`}
-                            className="relative flex flex-col h-32 rounded-xl border border-border bg-white p-5 group transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:border-zinc-300 overflow-hidden"
-                        >
-                            {/* Subtle highlight bar on hover */}
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    {notes.map((note) => {
+                        const preview = extractTextFromContent(note.content)
+                        return (
+                            <Link
+                                key={note.id}
+                                to={`/app/notes/${note.id}`}
+                                className="relative flex flex-col rounded-xl border border-border bg-white p-4 group transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:border-zinc-300 overflow-hidden"
+                            >
+                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                            <div className="flex items-start justify-between gap-2 mb-3 relative z-10 flex-1">
-                                <h3 className="text-base font-medium text-foreground line-clamp-2 leading-tight group-hover:text-accent transition-colors duration-300">
-                                    {note.title || 'Untitled Note'}
-                                </h3>
-                                <div className="p-1.5 rounded-md bg-muted/50 text-muted-foreground group-hover:bg-accent/10 group-hover:text-accent transition-colors duration-300 shrink-0">
-                                    <FileText size={16} />
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                    <h3 className="text-sm font-semibold text-foreground line-clamp-1 leading-snug group-hover:text-accent transition-colors duration-300">
+                                        {note.title || 'Untitled Note'}
+                                    </h3>
+                                    <FileText size={14} className="text-muted-foreground/50 group-hover:text-accent/60 transition-colors duration-300 shrink-0 mt-0.5" />
                                 </div>
-                            </div>
 
-                            <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50 relative z-10 group-hover:border-border/80 transition-colors duration-300">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Calendar size={12} className="group-hover:text-foreground/70 transition-colors duration-300" />
-                                    <span className="group-hover:text-foreground/70 transition-colors duration-300">
-                                        {new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
-                                </div>
-                                {/* Subtle arrow sliding in */}
-                                <span className="text-accent opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-sm font-medium leading-none">
-                                    &rarr;
-                                </span>
-                            </div>
-                        </Link>
-                    ))}
+                                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3 min-h-[48px]">
+                                    {preview || 'No content yet…'}
+                                </p>
+
+                                <p className="text-[11px] text-muted-foreground/60 mt-auto">
+                                    {new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                            </Link>
+                        )
+                    })}
                 </div>
             )}
         </div>
@@ -144,17 +161,19 @@ export default function NotesPage() {
         const clientInfo = noteClients[note.id]
         const groupKey = clientInfo ? clientInfo.clientId : 'unassigned'
         const groupName = clientInfo ? clientInfo.clientName : 'Standalone Notes'
+        const profilePictureUrl = clientInfo?.profilePictureUrl ?? null
 
         if (!acc[groupKey]) {
             acc[groupKey] = {
                 id: groupKey,
                 name: groupName,
+                profilePictureUrl,
                 notes: []
             }
         }
         acc[groupKey].notes.push(note)
         return acc
-    }, {} as Record<string, { id: string, name: string, notes: Note[] }>)
+    }, {} as Record<string, { id: string, name: string, profilePictureUrl: string | null, notes: Note[] }>)
 
     const sortedGroups = Object.values(groupedNotes).sort((a, b) => {
         if (a.id === 'unassigned') return 1
@@ -177,7 +196,7 @@ export default function NotesPage() {
                 </div>
                 <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
                     <Plus size={14} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">New</span>
+                    <span className="hidden sm:inline">Add</span>
                 </Button>
             </div>
         )
@@ -214,7 +233,7 @@ export default function NotesPage() {
                     ) : (
                         <div className="flex flex-col">
                             {sortedGroups.map((group) => (
-                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} notes={group.notes} />
+                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} />
                             ))}
                         </div>
                     )}

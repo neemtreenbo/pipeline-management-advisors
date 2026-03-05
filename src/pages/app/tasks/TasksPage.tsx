@@ -96,10 +96,9 @@ export default function TasksPage() {
     // Inject the "Add Task" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <Button onClick={openCreateDialog} className="h-8 text-xs sm:text-sm sm:h-9 rounded-full shadow-none px-3">
-                <Plus size={15} className="mr-1 sm:mr-1.5" />
-                <span className="hidden sm:inline">Add Task</span>
-                <span className="inline sm:hidden">Add</span>
+            <Button onClick={openCreateDialog} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
             </Button>
         )
         return () => setPortalNode(null)

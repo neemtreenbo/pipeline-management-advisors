@@ -35,9 +35,10 @@ type Tab = 'tasks' | 'proposals' | 'notes' | 'activity'
 interface DealDetailsModalProps {
     dealId: string
     onClose: () => void
+    onStageChange?: (dealId: string, newStage: DealStage) => void
 }
 
-export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalProps) {
+export default function DealDetailsModal({ dealId, onClose, onStageChange }: DealDetailsModalProps) {
     const { user } = useAuth()
 
     const [deal, setDeal] = useState<Deal | null>(null)
@@ -94,6 +95,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
         const oldStage = deal.stage
         setDeal((d) => d ? { ...d, stage: newStage } : d)
         setEditingStage(false)
+        onStageChange?.(deal.id, newStage)
         try {
             await updateDealStage(deal.id, newStage)
             await logDealActivity(orgId, user.id, deal.id, 'deal_stage_changed', {
@@ -240,8 +242,44 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                                     </div>
                                 </div>
 
-                                {/* Right: stage + close */}
+                                {/* Right: value + stage + close */}
                                 <div className="flex items-center gap-2 shrink-0">
+                                    {/* Value */}
+                                    {editingValue ? (
+                                        <div className="flex items-center gap-1 bg-muted/60 border border-border rounded-full px-2.5 py-1">
+                                            <span className="text-[11px] text-muted-foreground/50 select-none">₱</span>
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                placeholder="0"
+                                                className="text-[11px] font-medium text-foreground bg-transparent outline-none w-20 tabular-nums"
+                                                value={valueDraft}
+                                                onChange={(e) => setValueDraft(e.target.value)}
+                                                onBlur={handleValueSave}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleValueSave()
+                                                    if (e.key === 'Escape') setEditingValue(false)
+                                                }}
+                                            />
+                                        </div>
+                                    ) : deal.value > 0 ? (
+                                        <button
+                                            onClick={() => { setValueDraft(String(deal.value)); setEditingValue(true) }}
+                                            className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors tabular-nums"
+                                        >
+                                            {formatCurrency(deal.value)}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setValueDraft(''); setEditingValue(true) }}
+                                            className="flex items-center gap-1 text-[11px] text-muted-foreground/40 hover:text-muted-foreground bg-muted/40 hover:bg-muted/60 px-2.5 py-1 rounded-full transition-colors"
+                                        >
+                                            <Banknote size={10} />
+                                            Set Premium
+                                        </button>
+                                    )}
+
+                                    {/* Stage */}
                                     <div className="relative">
                                         <button
                                             onClick={() => setEditingStage((v) => !v)}
@@ -277,43 +315,19 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                                 </div>
                             </div>
 
-                            {/* Meta row */}
-                            <div className="flex items-center gap-4 mt-3 flex-wrap">
-                                <div className="flex items-center gap-1.5">
-                                    <Banknote size={12} className="text-muted-foreground/50" />
-                                    {editingValue ? (
-                                        <input
-                                            autoFocus
-                                            className="text-[13px] border-b border-foreground/20 outline-none w-24 bg-transparent"
-                                            type="number"
-                                            value={valueDraft}
-                                            onChange={(e) => setValueDraft(e.target.value)}
-                                            onBlur={handleValueSave}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') handleValueSave() }}
-                                        />
-                                    ) : (
-                                        <button
-                                            onClick={() => { setValueDraft(String(deal.value)); setEditingValue(true) }}
-                                            className="text-[13px] text-muted-foreground hover:text-foreground transition-colors"
-                                        >
-                                            {deal.value > 0 ? formatCurrency(deal.value) : <span className="text-muted-foreground/40">Set value</span>}
-                                        </button>
-                                    )}
+                            {/* Close date */}
+                            {deal.expected_close_date && (
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    <Calendar size={11} className="text-muted-foreground/40 shrink-0" />
+                                    <span className="text-[11px] text-muted-foreground/50">
+                                        {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                    </span>
                                 </div>
-
-                                {deal.expected_close_date && (
-                                    <div className="flex items-center gap-1.5">
-                                        <Calendar size={12} className="text-muted-foreground/50" />
-                                        <span className="text-[13px] text-muted-foreground">
-                                            {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                            })}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
+                            )}
                         </div>
 
                         {/* Tabs */}

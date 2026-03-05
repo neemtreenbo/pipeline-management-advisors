@@ -11,6 +11,7 @@ interface DealCardProps {
     index: number
     proposalCount: number
     attachmentCount: number
+    onStageChange?: (dealId: string, newStage: DealStage) => void
 }
 
 const STAGES_NEEDING_PROPOSAL: DealStage[] = ['Proposal Presented', 'Decision Pending']
@@ -27,6 +28,7 @@ export default function DealCard({
     index,
     proposalCount,
     attachmentCount,
+    onStageChange,
 }: DealCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -127,6 +129,7 @@ export default function DealCard({
                 <DealDetailsModal
                     dealId={deal.id}
                     onClose={() => setIsModalOpen(false)}
+                    onStageChange={onStageChange}
                 />
             )}
         </>

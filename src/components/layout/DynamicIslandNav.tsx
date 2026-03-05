@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Home, LayoutGrid, CheckSquare, Users, StickyNote } from 'lucide-react'
+import { Home, Kanban, CheckSquare, Users, StickyNote } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,7 +9,7 @@ import { usePageActions } from '@/contexts/PageActionsContext'
 const NAV_ITEMS = [
     { path: '/app/home', icon: Home, label: 'Home' },
     { path: '/app/clients', icon: Users, label: 'Clients' },
-    { path: '/app/pipeline', icon: LayoutGrid, label: 'Pipeline' },
+    { path: '/app/pipeline', icon: Kanban, label: 'Pipeline' },
     { path: '/app/tasks', icon: CheckSquare, label: 'Tasks' },
     { path: '/app/notes', icon: StickyNote, label: 'Notes' },
 ]

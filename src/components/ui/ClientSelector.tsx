@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 interface Client {
     id: string
     name: string
+    source: string | null
 }
 
 interface ClientSelectorProps {
@@ -38,7 +39,7 @@ export default function ClientSelector({
         if (!orgId) return
         supabase
             .from('clients')
-            .select('id, name')
+            .select('id, name, source')
             .eq('org_id', orgId)
             .order('name')
             .then(({ data }) => setClients(data ?? []))
@@ -102,15 +103,19 @@ export default function ClientSelector({
                 <Input
                     placeholder={placeholder}
                     value={clientSearch}
-                    onFocus={() => setClientDropdownOpen(true)}
+                    onFocus={() => {
+                        if (value) {
+                            onChange('', '')
+                            setClientSearch('')
+                        }
+                        setClientDropdownOpen(true)
+                    }}
                     onBlur={() => {
-                        setTimeout(() => {
-                            setClientDropdownOpen(false)
-                        }, 150)
+                        setTimeout(() => setClientDropdownOpen(false), 150)
                     }}
                     onChange={(e) => {
                         setClientSearch(e.target.value)
-                        onChange('', '') // Clear selection when typing
+                        onChange('', '')
                         setClientDropdownOpen(true)
                     }}
                     className={`h-11 pr-10 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none ${displayError ? 'border-destructive/50 focus-visible:ring-destructive' : ''}`}
@@ -126,20 +131,23 @@ export default function ClientSelector({
                 </button>
             </div>
 
-            {clientDropdownOpen && !value && (
+            {clientDropdownOpen && (
                 <div className="absolute top-[100%] left-0 z-10 w-full mt-1 border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-md bg-white">
                     {filteredClients.map((c) => (
                         <button
                             key={c.id}
                             type="button"
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+                            className="w-full text-left px-4 py-2.5 hover:bg-muted/50 transition-colors flex items-center justify-between gap-3"
                             onClick={() => {
                                 onChange(c.id, c.name)
                                 setClientSearch(c.name)
                                 setClientDropdownOpen(false)
                             }}
                         >
-                            {c.name}
+                            <span className="text-sm text-foreground truncate">{c.name}</span>
+                            {c.source && (
+                                <span className="text-[11px] text-muted-foreground/60 shrink-0 capitalize">{c.source}</span>
+                            )}
                         </button>
                     ))}
 
@@ -170,25 +178,6 @@ export default function ClientSelector({
                 </div>
             )}
 
-            {value && (
-                <div className="text-[13px] font-medium text-emerald-600 flex items-center justify-between mt-0.5 px-3 py-2 bg-emerald-50/50 border border-emerald-100/50 rounded-lg">
-                    <span className="flex items-center gap-2">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] shadow-sm">✓</span>
-                        {clients.find((c) => c.id === value)?.name || clientSearch}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            onChange('', '')
-                            setClientSearch('')
-                            // Attempt to refocus input is hard without ref, but typical UX is enough.
-                        }}
-                        className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-muted-foreground/30 underline-offset-2"
-                    >
-                        Change
-                    </button>
-                </div>
-            )}
             {displayError && (
                 <p className="text-xs text-destructive mt-1">{displayError}</p>
             )}

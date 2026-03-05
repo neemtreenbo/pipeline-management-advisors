@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, ChevronRight, Linkedin, Instagram } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram } from 'lucide-react'
+
 import { supabase } from '@/lib/supabase'
 import { fetchDealsByClient } from '@/lib/deals'
 import type { Deal } from '@/lib/deals'
@@ -10,8 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { getDealIcon } from '@/components/pipeline/DealIcon'
-import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
+import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
 
@@ -112,7 +112,6 @@ export default function ClientDetailPage() {
     const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '' })
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
-    const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
     const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
 
     useEffect(() => {
@@ -655,52 +654,9 @@ export default function ClientDetailPage() {
                     </TabsContent>
 
                     {/* Deals */}
-                    < TabsContent value="deals" >
-                        {
-                            deals.length === 0 ? (
-                                <EmptySection icon={Briefcase} label="deals" />
-                            ) : (
-                                <div className="flex flex-col gap-2">
-                                    {deals.map((deal) => {
-                                        const title = (deal.data as Record<string, string>)?.title || client?.name || '—'
-                                        const formattedValue = deal.value > 0
-                                            ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(deal.value)
-                                            : null
-                                        return (
-                                            <button
-                                                key={deal.id}
-                                                type="button"
-                                                onClick={() => setSelectedDealId(deal.id)}
-                                                className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-5 py-4 hover:border-zinc-300 hover:shadow-md transition-all"
-                                                id={`deal-link-${deal.id}`}
-                                            >
-                                                <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-muted-foreground shrink-0 border border-border/50 bg-muted/30 rounded p-0.5 shadow-sm">
-                                                            {getDealIcon(title, 14)}
-                                                        </span>
-                                                        <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                                        <span className="text-xs text-muted-foreground">{deal.stage}</span>
-                                                        {formattedValue && (
-                                                            <span className="text-xs font-medium text-foreground">{formattedValue}</span>
-                                                        )}
-                                                        {deal.expected_close_date && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            )
-                        }
-                    </TabsContent >
+                    <TabsContent value="deals">
+                        {client && <InlineDealsList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
 
                     {/* Tasks */}
                     < TabsContent value="tasks" >
@@ -722,14 +678,6 @@ export default function ClientDetailPage() {
                 </div >
             </Tabs >
 
-            {
-                selectedDealId && (
-                    <DealDetailsModal
-                        dealId={selectedDealId}
-                        onClose={() => setSelectedDealId(null)}
-                    />
-                )
-            }
         </>
     )
 }
