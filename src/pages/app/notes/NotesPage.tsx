@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getNotesByOrg, createNote, getClientsForNotes } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
@@ -100,8 +99,6 @@ export default function NotesPage() {
     const [noteClients, setNoteClients] = useState<Record<string, NoteClientInfo>>({})
     const [loading, setLoading] = useState(true)
 
-    const { setPortalNode } = usePageActions()
-
     useEffect(() => {
         if (!orgId) return
         loadNotes()
@@ -163,21 +160,17 @@ export default function NotesPage() {
         return a.name.localeCompare(b.name)
     })
 
-    // Inject the Search and "New Note" button into the Island navigation
-    useEffect(() => {
-        setPortalNode(
-            <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
-        )
-        return () => setPortalNode(null)
-    }, [setPortalNode])
-
     return (
         <div className="flex flex-col h-full bg-transparent">
             <div className="flex-1 overflow-y-auto pb-20 mt-4">
                 <div className="max-w-5xl mx-auto px-6 flex flex-col gap-6">
+
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-lg font-semibold text-foreground">Notes</h1>
+                        <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
+                            <Plus size={14} className="mr-1.5" /> Add
+                        </Button>
+                    </div>
 
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

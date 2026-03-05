@@ -46,11 +46,11 @@ export default function DynamicIslandNav() {
     const avatarUrl = user?.user_metadata?.avatar_url
 
     return (
-        <div className="sticky top-0 z-50 w-full pt-6 pb-4 px-4 flex justify-center bg-background/95 backdrop-blur-sm border-b border-border/60 shrink-0">
+        <div className="sticky top-0 z-50 w-full pt-6 pb-4 px-6 flex justify-center bg-background/95 backdrop-blur-sm border-b border-border/60 shrink-0">
             <motion.nav
                 layout
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                className="flex items-center bg-card border border-border shadow-sm rounded-full p-1.5 gap-1"
+                className="flex items-center bg-card border border-border shadow-sm rounded-full p-1.5 gap-1 w-full max-w-5xl"
             >
                 {/* Logo / Avatar dropdown area */}
                 <DropdownMenu.Root>

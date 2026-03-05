@@ -4,7 +4,6 @@ import { Plus, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lu
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { usePageActions } from '@/contexts/PageActionsContext'
 import { Button } from '@/components/ui/button'
 
 type SortField = 'name' | 'source' | 'email' | 'phone'
@@ -61,9 +60,7 @@ export default function ClientsPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
     const navigate = useNavigate()
-    const { setPortalNode } = usePageActions()
-
-    const [clients, setClients] = useState<Client[]>([])
+const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
 
     // Inline edit state (existing rows)
@@ -135,17 +132,6 @@ export default function ClientsPage() {
         }
         setNewRowSaving(false)
     }
-
-    // Inject the Search and "Add" button into the Island navigation
-    useEffect(() => {
-        setPortalNode(
-            <Button onClick={startAddingNew} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
-        )
-        return () => setPortalNode(null)
-    }, [setPortalNode])
 
     useEffect(() => {
         if (inlineEdit) {
@@ -262,6 +248,12 @@ export default function ClientsPage() {
     return (
         <div className="min-h-screen bg-transparent pt-4">
             <div className="max-w-5xl mx-auto px-6 pb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-lg font-semibold text-foreground">Clients</h1>
+                    <Button onClick={startAddingNew} className="h-8 text-xs rounded-full px-3 font-medium">
+                        <Plus size={14} className="mr-1.5" /> Add
+                    </Button>
+                </div>
                 {loading ? (
                     <div className="flex flex-col gap-2">
                         {[...Array(8)].map((_, i) => (

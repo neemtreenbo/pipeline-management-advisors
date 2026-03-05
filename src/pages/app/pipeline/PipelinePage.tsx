@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { usePageActions } from '@/contexts/PageActionsContext'
 import {
     PIPELINE_STAGES,
     fetchDealsByOrg,
@@ -18,7 +16,6 @@ import { fetchAttachmentsByDeal } from '@/lib/attachments'
 import type { DealAttachment } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 import NewDealModal from '@/components/pipeline/NewDealModal'
-import { Button } from '@/components/ui/button'
 
 interface AttachmentCounts {
     [dealId: string]: { proposal: number; total: number }
@@ -35,8 +32,6 @@ export default function PipelinePage() {
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
-
-    const { setPortalNode } = usePageActions()
 
     // Fetch deals when orgId is known
     const loadDeals = useCallback(async () => {
@@ -219,21 +214,6 @@ export default function PipelinePage() {
         setNewDealStage(stage)
         setShowNewDeal(true)
     }
-
-    // Inject search + "New Deal" button into the Island navigation
-    useEffect(() => {
-        setPortalNode(
-            <Button
-                id="nav-new-deal-btn"
-                onClick={() => handleOpenNewDeal('Opportunity')}
-                className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
-        )
-        return () => setPortalNode(null)
-    }, [setPortalNode])
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">

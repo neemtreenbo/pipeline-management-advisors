@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getTasks, createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
@@ -55,8 +54,6 @@ export default function TasksPage() {
 
     // Inline edit state
     const [editingTaskId, setEditingTaskId] = useState<string | undefined>(undefined)
-
-    const { setPortalNode } = usePageActions()
 
     const loadTasks = async (silent = false) => {
         if (!orgId) return
@@ -175,22 +172,19 @@ export default function TasksPage() {
         }
     }
 
-    // Inject search + "Add Task" button into the Island navigation
-    useEffect(() => {
-        setPortalNode(
-            <Button onClick={openInlineAdd} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus size={14} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Add</span>
-            </Button>
-        )
-        return () => setPortalNode(null)
-    }, [setPortalNode])
-
     return (
         <div className="flex flex-col h-full bg-transparent relative pt-6">
 
             <div className="flex-1 overflow-y-auto pb-20">
-                <div className="max-w-2xl mx-auto px-6 flex flex-col gap-5">
+                <div className="max-w-5xl mx-auto px-6 flex flex-col gap-5">
+
+                    {/* Page header */}
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-lg font-semibold text-foreground">Tasks</h1>
+                        <Button onClick={openInlineAdd} className="h-8 text-xs rounded-full px-3 font-medium">
+                            <Plus size={14} className="mr-1.5" /> Add
+                        </Button>
+                    </div>
 
                     {/* View tabs */}
                     <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="self-start">
