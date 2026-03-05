@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOrg } from '@/contexts/OrgContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getTasks, createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
@@ -9,7 +10,6 @@ import type { Task, TaskInsert } from '@/lib/tasks'
 interface ClientOption { id: string; name: string }
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TaskList from '@/components/tasks/TaskList'
 
@@ -28,12 +28,12 @@ function toISO(dateStr: string) {
 
 export default function TasksPage() {
     const { user } = useAuth()
+    const { orgId } = useOrg()
 
     const [tasks, setTasks] = useState<Task[]>([])
     const [loading, setLoading] = useState(true)
-    const [orgId, setOrgId] = useState<string | null>(null)
     const [view, setView] = useState<ViewType>('today')
-    const [search, setSearch] = useState('')
+
 
     // Available clients for @mention
     const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
@@ -57,20 +57,6 @@ export default function TasksPage() {
     const [editingTaskId, setEditingTaskId] = useState<string | undefined>(undefined)
 
     const { setPortalNode } = usePageActions()
-
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) setOrgId(data.org_id)
-            })
-    }, [user])
 
     const loadTasks = async (silent = false) => {
         if (!orgId) return
@@ -192,24 +178,13 @@ export default function TasksPage() {
     // Inject search + "Add Task" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        placeholder="Search tasks..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
-                    />
-                </div>
-                <Button onClick={openInlineAdd} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Plus size={14} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">Add</span>
-                </Button>
-            </div>
+            <Button onClick={openInlineAdd} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
+            </Button>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode, search])
+    }, [setPortalNode])
 
     return (
         <div className="flex flex-col h-full bg-transparent relative pt-6">
@@ -243,7 +218,7 @@ export default function TasksPage() {
                         <>
                             {/* Inline add row — inserted at top of list visually */}
                             {addingNew && (
-                                <div className="bg-white rounded-xl border border-border/60 shadow-sm overflow-hidden">
+                                <div className="bg-card rounded-xl border border-border/60 shadow-sm overflow-hidden">
                                     <div className="flex items-center gap-3 px-4 py-3">
                                         <div className="w-4 h-4 rounded-full border border-border/50 shrink-0" />
                                         <input
@@ -292,7 +267,7 @@ export default function TasksPage() {
                                                 left: newTitleRef.current.getBoundingClientRect().left,
                                                 zIndex: 50,
                                             }}
-                                            className="bg-white border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
+                                            className="bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
                                         >
                                             {newMentionClients.map(c => (
                                                 <button
@@ -327,7 +302,7 @@ export default function TasksPage() {
                             )}
 
                             <TaskList
-                                tasks={search.trim() ? tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase())) : tasks}
+                                tasks={tasks}
                                 orgId={orgId ?? undefined}
                                 onToggleComplete={handleToggleComplete}
                                 onTaskClick={(task) => { setAddingNew(false); setEditingTaskId(task.id) }}

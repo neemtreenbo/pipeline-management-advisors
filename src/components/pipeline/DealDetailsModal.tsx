@@ -149,7 +149,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
             <>
                 <div className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm" onClick={onClose} />
                 <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl h-[65vh] flex items-center justify-center pointer-events-auto">
+                    <div className="bg-card rounded-2xl shadow-xl w-full max-w-xl h-[65vh] flex items-center justify-center pointer-events-auto">
                         <p className="text-sm text-muted-foreground/50 animate-pulse">Loading…</p>
                     </div>
                 </div>
@@ -162,7 +162,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
             <>
                 <div className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm" onClick={onClose} />
                 <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl h-[65vh] flex flex-col items-center justify-center gap-3 pointer-events-auto">
+                    <div className="bg-card rounded-2xl shadow-xl w-full max-w-xl h-[65vh] flex flex-col items-center justify-center gap-3 pointer-events-auto">
                         <p className="text-sm text-muted-foreground">Deal not found.</p>
                         <button className="text-sm text-foreground underline underline-offset-2" onClick={onClose}>Close</button>
                     </div>
@@ -175,7 +175,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
         <>
             <div className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm" onClick={onClose} />
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
-                <div className="bg-white rounded-2xl shadow-[0_16px_48px_-12px_rgba(0,0,0,0.18)] w-full max-w-xl h-[65vh] flex flex-col overflow-hidden border border-black/[0.06] pointer-events-auto">
+                <div className="bg-card rounded-2xl shadow-[0_16px_48px_-12px_rgba(0,0,0,0.18)] w-full max-w-xl h-[65vh] flex flex-col overflow-hidden border border-border pointer-events-auto">
 
                     {/* Header */}
                     <div className="shrink-0 border-b border-border/60">
@@ -291,7 +291,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange }: Dea
                                         {editingStage && (
                                             <>
                                                 <div className="fixed inset-0 z-30" onClick={() => setEditingStage(false)} />
-                                                <div className="absolute right-0 top-full mt-1.5 bg-white border border-border rounded-xl shadow-lg z-40 py-1 min-w-[176px]">
+                                                <div className="absolute right-0 top-full mt-1.5 bg-popover border border-border rounded-xl shadow-lg z-40 py-1 min-w-[176px]">
                                                     {PIPELINE_STAGES.map((s) => (
                                                         <button
                                                             key={s}

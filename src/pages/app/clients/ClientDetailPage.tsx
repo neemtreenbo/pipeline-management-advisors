@@ -314,7 +314,7 @@ export default function ClientDetailPage() {
                                                     id="edit-source"
                                                     value={editForm.source}
                                                     onChange={e => setEditForm(f => ({ ...f, source: e.target.value }))}
-                                                    className="flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
+                                                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
                                                 >
                                                     <option value="">Select source...</option>
                                                     <option value="referral">Referral</option>
@@ -336,7 +336,7 @@ export default function ClientDetailPage() {
                                             </div>
                                         </div>
                                         {saveError && (
-                                            <p className="text-sm text-destructive bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                                            <p className="text-sm text-destructive bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg px-3 py-2">
                                                 {saveError}
                                             </p>
                                         )}
@@ -435,13 +435,13 @@ export default function ClientDetailPage() {
                     {/* Overview */}
                     <TabsContent value="overview">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4">
+                            <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
                                 <h3 className="text-sm font-semibold text-foreground">Contact Details</h3>
                                 <InfoRow label="Email" value={client.email} />
                                 <InfoRow label="Phone" value={client.phone} />
                                 <InfoRow label="Source" value={formatSource(client.source)} />
                             </div>
-                            <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4">
+                            <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
                                 <h3 className="text-sm font-semibold text-foreground">Record Info</h3>
                                 <InfoRow label="Member since" value={memberSince} />
                                 <div className="flex flex-col gap-0.5">
@@ -463,7 +463,7 @@ export default function ClientDetailPage() {
 
                             {/* Professional Info */}
                             {(client.company_name || client.company_industry || client.company_website || client.job_title || client.occupation) && (
-                                <div className="rounded-xl border border-border bg-white p-5 flex flex-col gap-4 sm:col-span-2">
+                                <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4 sm:col-span-2">
                                     <h3 className="text-sm font-semibold text-foreground">Professional Summary</h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <InfoRow label="Company" value={client.company_name} />
@@ -492,7 +492,7 @@ export default function ClientDetailPage() {
                                             <Input
                                                 id="intel-linkedin"
                                                 placeholder="https://linkedin.com/in/..."
-                                                className="bg-white"
+                                                className="bg-background"
                                                 value={client.linkedin_url || ''}
                                                 onChange={async (e) => {
                                                     const val = e.target.value;
@@ -530,7 +530,7 @@ export default function ClientDetailPage() {
                                             <Input
                                                 id="intel-instagram"
                                                 placeholder="https://instagram.com/..."
-                                                className="bg-white"
+                                                className="bg-background"
                                                 value={client.instagram_url || ''}
                                                 onChange={async (e) => {
                                                     const val = e.target.value;
@@ -570,7 +570,7 @@ export default function ClientDetailPage() {
                                                         <FileText size={16} className="text-muted-foreground" />
                                                         Summary
                                                     </h3>
-                                                    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                                                         <p className="text-[15px] text-foreground leading-relaxed">{client.ai_summary}</p>
                                                     </div>
                                                 </div>
@@ -583,7 +583,7 @@ export default function ClientDetailPage() {
                                                         <CheckSquare size={16} className="text-muted-foreground" />
                                                         Talking Points
                                                     </h3>
-                                                    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                                                         {(() => {
                                                             const tp = client.talking_points as any;
                                                             const pointsArray = Array.isArray(tp) ? tp : (tp?.items && Array.isArray(tp.items) ? tp.items : null);
@@ -620,7 +620,7 @@ export default function ClientDetailPage() {
                                                     </h3>
                                                     <div className="flex flex-col gap-4">
                                                         {client.experiences && (
-                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                                                                 <h4 className="text-sm font-semibold text-foreground mb-3">Experiences</h4>
                                                                 <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
                                                                     {typeof client.experiences === 'string' ? client.experiences : JSON.stringify(client.experiences, null, 2)}
@@ -628,7 +628,7 @@ export default function ClientDetailPage() {
                                                             </div>
                                                         )}
                                                         {client.education && (
-                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                                                                 <h4 className="text-sm font-semibold text-foreground mb-3">Education</h4>
                                                                 <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
                                                                     {typeof client.education === 'string' ? client.education : JSON.stringify(client.education, null, 2)}
@@ -636,7 +636,7 @@ export default function ClientDetailPage() {
                                                             </div>
                                                         )}
                                                         {client.updates && (
-                                                            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                                                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                                                                 <h4 className="text-sm font-semibold text-foreground mb-3">Updates</h4>
                                                                 <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
                                                                     {typeof client.updates === 'string' ? client.updates : JSON.stringify(client.updates, null, 2)}

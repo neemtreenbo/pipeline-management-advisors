@@ -7,7 +7,7 @@ export default function LandingPage() {
         <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-16">
             {/* Hero */}
             <div className="max-w-lg w-full text-center mb-16">
-                <span className="inline-block bg-blue-50 text-accent border border-blue-100 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-widest mb-6">
+                <span className="inline-block bg-blue-50 dark:bg-blue-900/30 text-accent border border-blue-100 dark:border-blue-900/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-widest mb-6">
                     Sales Rep CRM
                 </span>
                 <h1 className="text-4xl font-semibold text-foreground leading-tight mb-4 tracking-tight">
@@ -36,7 +36,7 @@ export default function LandingPage() {
                 ].map(f => (
                     <div
                         key={f.title}
-                        className="rounded-xl border border-border bg-white p-5 text-center hover:shadow-sm hover:border-zinc-300 transition-all duration-150"
+                        className="rounded-xl border border-border bg-card p-5 text-center hover:shadow-sm hover:border-border transition-all duration-150"
                     >
                         <div className="text-2xl mb-3">{f.icon}</div>
                         <h3 className="text-sm font-semibold text-foreground mb-1">{f.title}</h3>

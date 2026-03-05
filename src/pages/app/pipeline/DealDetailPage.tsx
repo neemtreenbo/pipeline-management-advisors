@@ -8,7 +8,7 @@ import {
     User,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { useOrg } from '@/contexts/OrgContext'
 import {
     PIPELINE_STAGES,
     fetchDealById,
@@ -51,27 +51,12 @@ export default function DealDetailPage() {
     const [activities, setActivities] = useState<Array<{
         id: string; event_type: string; data: Record<string, unknown>; created_at: string; actor_id: string
     }>>([])
-    const [orgId, setOrgId] = useState<string | null>(null)
+    const { orgId } = useOrg()
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>('proposals')
     const [editingStage, setEditingStage] = useState(false)
     const [editingValue, setEditingValue] = useState(false)
     const [valueDraft, setValueDraft] = useState('')
-
-    // Fetch org
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) setOrgId(data.org_id)
-            })
-    }, [user])
 
     const loadDeal = useCallback(async () => {
         if (!dealId) return
@@ -160,7 +145,7 @@ export default function DealDetailPage() {
     return (
         <div className="min-h-screen bg-background">
             {/* Header */}
-            <div className="border-b border-border bg-white sticky top-0 z-10">
+            <div className="border-b border-border bg-background sticky top-0 z-10">
                 <div className="max-w-4xl mx-auto px-6 py-4">
                     <button
                         onClick={() => navigate('/app/pipeline')}
@@ -199,7 +184,7 @@ export default function DealDetailPage() {
                                         className="fixed inset-0 z-30"
                                         onClick={() => setEditingStage(false)}
                                     />
-                                    <div className="absolute right-0 top-full mt-1.5 bg-white border border-border rounded-xl shadow-lg z-40 py-1 min-w-[180px]">
+                                    <div className="absolute right-0 top-full mt-1.5 bg-popover border border-border rounded-xl shadow-lg z-40 py-1 min-w-[180px]">
                                         {PIPELINE_STAGES.map((s) => (
                                             <button
                                                 key={s}

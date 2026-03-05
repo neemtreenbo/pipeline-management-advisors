@@ -111,7 +111,7 @@ export default function ProposalUploader({
         return (
             <div
                 key={a.id}
-                className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-white hover:bg-muted/30 transition-colors shadow-sm"
+                className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors shadow-sm"
             >
                 <div className="shrink-0">
                     {FILE_ICON[a.mime_type ?? ''] ?? <FileText size={16} className="text-muted-foreground" />}
@@ -139,7 +139,7 @@ export default function ProposalUploader({
                         onClick={() => handleDelete(a.id, a.storage_path)}
                         disabled={deletingId === a.id}
                         title="Delete"
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                     >
                         <Trash2 size={15} />
                     </button>
@@ -152,7 +152,7 @@ export default function ProposalUploader({
         <div className="flex flex-col gap-6">
             {/* Warning */}
             {isMissingProposal && (
-                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-100/50 text-amber-700 text-sm shadow-sm">
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100/50 dark:border-amber-900/30 text-amber-700 dark:text-amber-400 text-sm shadow-sm">
                     <AlertTriangle size={16} className="shrink-0" />
                     <p>Proposal not uploaded yet. This deal is in <strong>{dealStage}</strong> stage.</p>
                 </div>
@@ -186,7 +186,7 @@ export default function ProposalUploader({
                 </div>
 
                 {uploadError && (
-                    <div className="text-sm text-destructive bg-red-50 border border-red-100 rounded-xl px-4 py-3 shadow-sm mt-1">
+                    <div className="text-sm text-destructive bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl px-4 py-3 shadow-sm mt-1">
                         {uploadError}
                     </div>
                 )}

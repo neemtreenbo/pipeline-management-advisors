@@ -9,11 +9,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import ClientSelector from '@/components/ui/ClientSelector'
 
 const TYPE_META: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-    client: { icon: User,        label: 'Client',   color: 'text-blue-500 bg-blue-50' },
-    deal:   { icon: Briefcase,   label: 'Deal',     color: 'text-violet-500 bg-violet-50' },
-    task:   { icon: CheckSquare, label: 'Task',     color: 'text-amber-500 bg-amber-50' },
-    note:   { icon: FileText,    label: 'Note',     color: 'text-emerald-500 bg-emerald-50' },
-    proposal: { icon: File,      label: 'Proposal', color: 'text-rose-500 bg-rose-50' },
+    client: { icon: User,        label: 'Client',   color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' },
+    deal:   { icon: Briefcase,   label: 'Deal',     color: 'text-violet-500 bg-violet-50 dark:bg-violet-900/30' },
+    task:   { icon: CheckSquare, label: 'Task',     color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' },
+    note:   { icon: FileText,    label: 'Note',     color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30' },
+    proposal: { icon: File,      label: 'Proposal', color: 'text-rose-500 bg-rose-50 dark:bg-rose-900/30' },
 }
 
 interface NoteLinksProps {

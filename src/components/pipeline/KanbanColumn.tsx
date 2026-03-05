@@ -25,7 +25,7 @@ export default function KanbanColumn({
 }: KanbanColumnProps) {
     return (
         <div
-            className="flex flex-col bg-[#F5F5F5] rounded-xl p-3 min-w-[240px] w-64 shrink-0"
+            className="flex flex-col bg-muted/50 rounded-xl p-3 min-w-[240px] w-64 shrink-0"
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
             {/* Column header */}
@@ -42,7 +42,7 @@ export default function KanbanColumn({
                 </div>
                 <button
                     onClick={() => onAddDeal(stage)}
-                    className="text-muted-foreground/50 hover:text-foreground transition-colors duration-150 p-0.5 rounded hover:bg-black/5"
+                    className="text-muted-foreground/50 hover:text-foreground transition-colors duration-150 p-0.5 rounded hover:bg-muted/60"
                     id={`add-deal-${stage.toLowerCase().replace(/\s+/g, '-')}`}
                     title={`Add deal to ${stage}`}
                 >
@@ -57,7 +57,7 @@ export default function KanbanColumn({
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={`flex flex-col gap-2 flex-1 min-h-[120px] rounded-lg transition-all duration-150 ${
-                            snapshot.isDraggingOver ? 'ring-1 ring-black/10 bg-black/[0.02]' : ''
+                            snapshot.isDraggingOver ? 'ring-1 ring-border bg-muted/30' : ''
                         }`}
                     >
                         {deals.map((deal, index) => {

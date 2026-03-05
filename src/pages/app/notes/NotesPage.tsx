@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOrg } from '@/contexts/OrgContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { supabase } from '@/lib/supabase'
 import { getNotesByOrg, createNote, getClientsForNotes } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 function getInitials(name: string) {
     if (!name) return '?'
@@ -65,7 +65,7 @@ function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { c
                             <Link
                                 key={note.id}
                                 to={`/app/notes/${note.id}`}
-                                className="relative flex flex-col rounded-xl border border-border bg-white p-4 group transition-all duration-150 hover:-translate-y-1 hover:shadow-md hover:scale-[1.015] hover:border-zinc-300 overflow-hidden"
+                                className="relative flex flex-col rounded-xl border border-border bg-card p-4 group transition-all duration-150 hover:-translate-y-1 hover:shadow-md hover:scale-[1.015] hover:border-border overflow-hidden"
                             >
                                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -94,29 +94,13 @@ function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { c
 
 export default function NotesPage() {
     const { user } = useAuth()
+    const { orgId } = useOrg()
     const navigate = useNavigate()
     const [notes, setNotes] = useState<Note[]>([])
     const [noteClients, setNoteClients] = useState<Record<string, NoteClientInfo>>({})
     const [loading, setLoading] = useState(true)
-    const [orgId, setOrgId] = useState<string | null>(null)
-    const [searchQuery, setSearchQuery] = useState('')
-    const { setPortalNode } = usePageActions()
 
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) {
-                    setOrgId(data.org_id)
-                }
-            })
-    }, [user])
+    const { setPortalNode } = usePageActions()
 
     useEffect(() => {
         if (!orgId) return
@@ -153,9 +137,7 @@ export default function NotesPage() {
         }
     }, [orgId, user, navigate])
 
-    const filteredNotes = notes.filter((note) =>
-        (note.title || 'Untitled Note').toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredNotes = notes
 
     const groupedNotes = filteredNotes.reduce((acc, note) => {
         const clientInfo = noteClients[note.id]
@@ -184,24 +166,13 @@ export default function NotesPage() {
     // Inject the Search and "New Note" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        placeholder="Search notes..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
-                    />
-                </div>
-                <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Plus size={14} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">Add</span>
-                </Button>
-            </div>
+            <Button onClick={handleCreateNote} className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
+            </Button>
         )
         return () => setPortalNode(null)
-    }, [handleCreateNote, setPortalNode, searchQuery])
+    }, [setPortalNode])
 
     return (
         <div className="flex flex-col h-full bg-transparent">
@@ -221,14 +192,12 @@ export default function NotesPage() {
                             </div>
                             <h3 className="text-lg font-medium text-foreground mb-1">No notes found</h3>
                             <p className="text-sm text-muted-foreground max-w-xs mx-auto mb-6">
-                                {searchQuery ? 'Try adjusting your search query.' : 'Capture meeting summaries, context, and interconnected knowledge.'}
+                                Capture meeting summaries, context, and interconnected knowledge.
                             </p>
-                            {!searchQuery && (
-                                <Button onClick={handleCreateNote} variant="secondary">
+                            <Button onClick={handleCreateNote} variant="secondary">
                                     <Plus size={16} />
                                     Draft a note
-                                </Button>
-                            )}
+                            </Button>
                         </div>
                     ) : (
                         <div className="flex flex-col">

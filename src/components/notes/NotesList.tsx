@@ -137,7 +137,7 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd }: No
                     <Link
                         key={note.id}
                         to={`/app/notes/${note.id}`}
-                        className="flex items-start gap-3 rounded-xl border border-border bg-white p-4 hover:border-zinc-300 hover:shadow-sm transition-all group"
+                        className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 hover:border-border hover:shadow-sm transition-all group"
                     >
                         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                             <h4 className="text-sm font-medium text-foreground truncate">{note.title || 'Untitled'}</h4>
@@ -158,7 +158,7 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd }: No
         <div className="flex flex-col gap-2">
             {/* Add trigger / form */}
             {adding ? (
-                <div className="flex flex-col gap-2 bg-white border border-border/60 rounded-xl px-3 py-2.5">
+                <div className="flex flex-col gap-2 bg-card border border-border/60 rounded-xl px-3 py-2.5">
                     <input
                         ref={addTitleRef}
                         className="w-full text-sm font-medium bg-transparent outline-none placeholder:text-muted-foreground/40 text-foreground"
@@ -211,7 +211,7 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd }: No
             {notes.length === 0 && !adding ? (
                 <div className="py-8 text-center text-[13px] text-muted-foreground/40">No notes yet</div>
             ) : (
-                <div className="bg-white rounded-xl border border-border/60 overflow-hidden flex flex-col">
+                <div className="bg-card rounded-xl border border-border/60 overflow-hidden flex flex-col">
                     {notes.map((note) => (
                         <div
                             key={note.id}

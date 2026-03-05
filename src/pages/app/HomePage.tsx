@@ -14,7 +14,7 @@ export default function HomePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
                     <button
                         onClick={() => navigate('/app/clients')}
-                        className="rounded-xl border border-border bg-white p-5 text-left hover:shadow-md hover:border-zinc-300 transition-all duration-150 group"
+                        className="rounded-xl border border-border bg-card p-5 text-left hover:shadow-md hover:border-border transition-all duration-150 group"
                         id="goto-clients"
                     >
                         <Users size={20} className="text-accent mb-3" />
@@ -23,7 +23,7 @@ export default function HomePage() {
                     </button>
                     <button
                         onClick={() => navigate('/app/pipeline')}
-                        className="rounded-xl border border-border bg-white p-5 text-left hover:shadow-md hover:border-zinc-300 transition-all duration-150"
+                        className="rounded-xl border border-border bg-card p-5 text-left hover:shadow-md hover:border-border transition-all duration-150"
                         id="goto-pipeline"
                     >
                         <Briefcase size={20} className="text-accent mb-3" />
@@ -32,7 +32,7 @@ export default function HomePage() {
                     </button>
                     <button
                         onClick={() => navigate('/app/notes')}
-                        className="rounded-xl border border-border bg-white p-5 text-left hover:shadow-md hover:border-zinc-300 transition-all duration-150"
+                        className="rounded-xl border border-border bg-card p-5 text-left hover:shadow-md hover:border-border transition-all duration-150"
                         id="goto-notes"
                     >
                         <FileText size={20} className="text-accent mb-3" />

@@ -158,7 +158,7 @@ export default function TaskDialog({
         <>
             <div className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm" onClick={onClose} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none">
-                <div className="bg-white rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] w-full max-w-lg flex flex-col overflow-hidden border border-black/[0.04] pointer-events-auto">
+                <div className="bg-card rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] w-full max-w-lg flex flex-col overflow-hidden border border-border pointer-events-auto">
                     <div className="flex items-center justify-between px-8 py-6 pb-2">
                         <div className="space-y-1">
                             <h2 className="text-xl font-semibold tracking-tight text-foreground">
@@ -197,7 +197,7 @@ export default function TaskDialog({
                                 placeholder="What needs to be done?"
                                 value={form.title}
                                 onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-                                className="h-11 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none"
+                                className="h-11 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background transition-all shadow-none"
                             />
                         </div>
 
@@ -208,7 +208,7 @@ export default function TaskDialog({
                                 placeholder="Add more details..."
                                 value={form.description}
                                 onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                                className="flex min-h-[80px] w-full rounded-xl border border-muted-foreground/10 bg-muted/30 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none resize-y"
+                                className="flex min-h-[80px] w-full rounded-xl border border-muted-foreground/10 bg-muted/30 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:bg-background transition-all shadow-none resize-y"
                             />
                         </div>
 
@@ -219,12 +219,12 @@ export default function TaskDialog({
                                 type="date"
                                 value={form.due_at}
                                 onChange={(e) => setForm(f => ({ ...f, due_at: e.target.value }))}
-                                className="h-11 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none"
+                                className="h-11 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background transition-all shadow-none"
                             />
                         </div>
 
                         {error && (
-                            <p className="text-sm text-destructive bg-red-50/50 border border-red-100 rounded-xl px-4 py-3">
+                            <p className="text-sm text-destructive bg-red-50/50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl px-4 py-3">
                                 {error}
                             </p>
                         )}

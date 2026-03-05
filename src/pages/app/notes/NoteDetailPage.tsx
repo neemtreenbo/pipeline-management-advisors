@@ -116,7 +116,7 @@ export default function NoteDetailPage() {
     return (
         <div className="flex flex-col h-full bg-background">
             {/* Top Bar */}
-            <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-white sticky top-0 z-10 shrink-0">
+            <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-background sticky top-0 z-10 shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate('/app/notes')}
@@ -135,7 +135,7 @@ export default function NoteDetailPage() {
                         <Calendar size={12} />
                         <span>Last edited {new Date(note.updated_at).toLocaleString()}</span>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={handleDelete} className="text-muted-foreground hover:text-destructive hover:bg-red-50">
+                    <Button variant="ghost" size="sm" onClick={handleDelete} className="text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20">
                         <Trash2 size={16} />
                     </Button>
                 </div>

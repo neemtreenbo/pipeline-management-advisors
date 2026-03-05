@@ -31,47 +31,47 @@ const EVENT_CONFIG: Record<
     deal_created: {
         icon: <Star size={14} />,
         label: 'Deal created',
-        color: 'text-blue-500 bg-blue-50',
+        color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/30',
     },
     deal_stage_changed: {
         icon: <ArrowRight size={14} />,
         label: 'Stage updated',
-        color: 'text-purple-500 bg-purple-50',
+        color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/30',
     },
     proposal_uploaded: {
         icon: <Upload size={14} />,
         label: 'Proposal uploaded',
-        color: 'text-green-600 bg-green-50',
+        color: 'text-green-500 bg-green-50 dark:bg-green-900/30',
     },
     note_created: {
         icon: <StickyNote size={14} />,
         label: 'Note added',
-        color: 'text-amber-600 bg-amber-50',
+        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
     },
     note_linked: {
         icon: <StickyNote size={14} />,
         label: 'Note linked',
-        color: 'text-amber-600 bg-amber-50',
+        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
     },
     note_edited: {
         icon: <StickyNote size={14} />,
         label: 'Note edited',
-        color: 'text-amber-600 bg-amber-50',
+        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
     },
     task_created: {
         icon: <CheckSquare size={14} />,
         label: 'Task created',
-        color: 'text-zinc-600 bg-zinc-100',
+        color: 'text-muted-foreground bg-muted',
     },
     task_completed: {
         icon: <CheckSquare size={14} />,
         label: 'Task completed',
-        color: 'text-green-600 bg-green-50',
+        color: 'text-green-500 bg-green-50 dark:bg-green-900/30',
     },
     task_uncompleted: {
         icon: <CheckSquare size={14} />,
         label: 'Task reopened',
-        color: 'text-amber-600 bg-amber-50',
+        color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',
     },
 }
 
@@ -80,7 +80,7 @@ function getEventConfig(eventType: string) {
         EVENT_CONFIG[eventType] ?? {
             icon: <Activity size={14} />,
             label: eventType.replace(/_/g, ' '),
-            color: 'text-zinc-500 bg-zinc-100',
+            color: 'text-muted-foreground bg-muted',
         }
     )
 }

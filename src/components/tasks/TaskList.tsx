@@ -69,7 +69,7 @@ export default function TaskList({
     }
 
     return (
-        <div className="bg-white rounded-xl border border-border/60 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-card rounded-xl border border-border/60 shadow-sm overflow-hidden flex flex-col">
             {tasks.map(task => (
                 <TaskItem
                     key={task.id}

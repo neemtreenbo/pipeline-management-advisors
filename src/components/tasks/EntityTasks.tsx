@@ -140,7 +140,7 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
     }
 
     const inlineAddForm = (
-        <div className="flex items-center gap-2 bg-white border border-border/60 rounded-xl px-3 py-2.5">
+        <div className="flex items-center gap-2 bg-card border border-border/60 rounded-xl px-3 py-2.5">
             <input
                 ref={addTitleRef}
                 className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/40 text-foreground"

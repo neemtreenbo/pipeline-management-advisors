@@ -179,7 +179,7 @@ export default function TaskItem({
                             left: titleRef.current.getBoundingClientRect().left,
                             zIndex: 50,
                         }}
-                        className="bg-white border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
+                        className="bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
                     >
                         {mentionClients.map(c => (
                             <button

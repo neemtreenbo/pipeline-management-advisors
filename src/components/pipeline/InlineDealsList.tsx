@@ -100,7 +100,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
             <div className="flex flex-col gap-2">
                 {/* Add trigger / inline form */}
                 {adding ? (
-                    <div className="flex flex-col gap-3 bg-white border border-border/60 rounded-xl px-4 py-3">
+                    <div className="flex flex-col gap-3 bg-card border border-border/60 rounded-xl px-4 py-3">
                         {/* Plan type pills */}
                         <div className="flex flex-wrap gap-1.5">
                             {PLAN_TYPES.map((plan) => (
@@ -185,7 +185,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
                                     key={deal.id}
                                     type="button"
                                     onClick={() => setSelectedDealId(deal.id)}
-                                    className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-white px-4 py-3 hover:border-border hover:shadow-sm transition-all"
+                                    className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3 hover:border-border hover:shadow-sm transition-all"
                                 >
                                     <div className="flex flex-col gap-0.5 min-w-0">
                                         <div className="flex items-center gap-2">

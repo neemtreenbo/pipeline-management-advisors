@@ -76,7 +76,7 @@ export default function AddLinkModal({ orgId, noteId, isOpen, onOpenChange, onLi
         <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity" />
-                <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[80vh] border border-border">
+                <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-popover rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[80vh] border border-border">
                     <div className="flex flex-col p-4 border-b border-border bg-muted/30">
                         <Dialog.Title className="text-lg font-semibold text-foreground flex items-center gap-2">
                             <LinkIcon size={18} />
@@ -87,7 +87,7 @@ export default function AddLinkModal({ orgId, noteId, isOpen, onOpenChange, onLi
                         </Dialog.Description>
                     </div>
 
-                    <div className="p-4 border-b border-border bg-white sticky top-0">
+                    <div className="p-4 border-b border-border bg-popover sticky top-0">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                             <Input
@@ -120,7 +120,7 @@ export default function AddLinkModal({ orgId, noteId, isOpen, onOpenChange, onLi
                                             key={res.id}
                                             onClick={() => handleSelect(res)}
                                             disabled={linkingId === res.id}
-                                            className="w-full text-left flex items-center justify-between p-3 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-border transition-all group disabled:opacity-50"
+                                            className="w-full text-left flex items-center justify-between p-3 rounded-xl hover:bg-card hover:shadow-sm border border-transparent hover:border-border transition-all group disabled:opacity-50"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-accent/10 group-hover:text-accent transition-colors text-muted-foreground">

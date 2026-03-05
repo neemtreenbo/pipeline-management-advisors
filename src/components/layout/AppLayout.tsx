@@ -1,11 +1,13 @@
 import { Outlet } from 'react-router-dom'
 import DynamicIslandNav from './DynamicIslandNav'
 import { PageActionsProvider } from '@/contexts/PageActionsContext'
+import { OrgProvider } from '@/contexts/OrgContext'
 
 export default function AppLayout() {
     return (
+        <OrgProvider>
         <PageActionsProvider>
-            <div className="flex flex-col h-screen w-full bg-slate-50/50 overflow-hidden relative font-sans">
+            <div className="flex flex-col h-screen w-full bg-background overflow-hidden relative font-sans">
                 {/* Background radial gradient for premium feel */}
                 <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.04),transparent_50%),radial-gradient(circle_at_bottom_right,rgba(147,51,234,0.04),transparent_50%)]" />
 
@@ -20,5 +22,6 @@ export default function AppLayout() {
                 </main>
             </div>
         </PageActionsProvider>
+        </OrgProvider>
     )
 }

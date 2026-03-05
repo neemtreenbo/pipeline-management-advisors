@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOrg } from '@/contexts/OrgContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
-import { supabase } from '@/lib/supabase'
 import {
     PIPELINE_STAGES,
     fetchDealsByOrg,
@@ -17,7 +17,6 @@ import type { DealAttachment } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 import NewDealModal from '@/components/pipeline/NewDealModal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 interface AttachmentCounts {
     [dealId: string]: { proposal: number; total: number }
@@ -25,29 +24,14 @@ interface AttachmentCounts {
 
 export default function PipelinePage() {
     const { user } = useAuth()
-    const [orgId, setOrgId] = useState<string | null>(null)
+    const { orgId } = useOrg()
     const [deals, setDeals] = useState<Deal[]>([])
     const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
     const [loading, setLoading] = useState(true)
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
-    const [search, setSearch] = useState('')
-    const { setPortalNode } = usePageActions()
 
-    // Fetch org membership once
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) setOrgId(data.org_id)
-            })
-    }, [user])
+    const { setPortalNode } = usePageActions()
 
     // Fetch deals when orgId is known
     const loadDeals = useCallback(async () => {
@@ -82,15 +66,7 @@ export default function PipelinePage() {
         loadDeals()
     }, [loadDeals])
 
-    // Filter deals by search query
-    const filteredDeals = search.trim()
-        ? deals.filter(d => {
-            const title = (d.data as Record<string, string>)?.title ?? ''
-            const client = d.client?.name ?? ''
-            const q = search.toLowerCase()
-            return title.toLowerCase().includes(q) || client.toLowerCase().includes(q)
-        })
-        : deals
+    const filteredDeals = deals
 
     // Deal lookup by stage
     const dealsByStage: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
@@ -242,28 +218,17 @@ export default function PipelinePage() {
     // Inject search + "New Deal" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        placeholder="Search pipeline..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
-                    />
-                </div>
-                <Button
-                    id="nav-new-deal-btn"
-                    onClick={() => handleOpenNewDeal('Opportunity')}
-                    className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                    <Plus size={14} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">Add</span>
-                </Button>
-            </div>
+            <Button
+                id="nav-new-deal-btn"
+                onClick={() => handleOpenNewDeal('Opportunity')}
+                className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+                <Plus size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
+            </Button>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode, search])
+    }, [setPortalNode])
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">

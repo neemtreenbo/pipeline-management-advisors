@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Kanban, CheckSquare, Users, StickyNote } from 'lucide-react'
+import { Home, Kanban, CheckSquare, Users, StickyNote, Sun, Moon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import { useOrg } from '@/contexts/OrgContext'
+import GlobalSearch from './GlobalSearch'
 
 const NAV_ITEMS = [
     { path: '/app/home', icon: Home, label: 'Home' },
@@ -22,7 +25,9 @@ export default function DynamicIslandNav() {
     const navigate = useNavigate()
     const { user, signOut } = useAuth()
     const { portalNode } = usePageActions()
+    const { theme, toggleTheme } = useTheme()
 
+    const { orgId } = useOrg()
     const [hoveredPath, setHoveredPath] = useState<string | null>(null)
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -41,29 +46,12 @@ export default function DynamicIslandNav() {
     const avatarUrl = user?.user_metadata?.avatar_url
 
     return (
-        <div className="sticky top-0 z-50 w-full pt-6 pb-4 px-4 flex justify-center bg-slate-50/95 backdrop-blur-sm border-b border-slate-200/60 shrink-0">
+        <div className="sticky top-0 z-50 w-full pt-6 pb-4 px-4 flex justify-center bg-background/95 backdrop-blur-sm border-b border-border/60 shrink-0">
             <motion.nav
                 layout
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                className="flex items-center bg-white border border-slate-200 shadow-sm rounded-full p-1.5 gap-1"
+                className="flex items-center bg-card border border-border shadow-sm rounded-full p-1.5 gap-1"
             >
-                {/* Render any injected page actions inline with the island */}
-                <AnimatePresence>
-                    {portalNode && (
-                        <motion.div
-                            initial={{ opacity: 0, width: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, width: "auto", scale: 1 }}
-                            exit={{ opacity: 0, width: 0, scale: 0.8, filter: "blur(4px)" }}
-                            className="flex items-center overflow-hidden whitespace-nowrap"
-                        >
-                            <div className="pl-2 pr-1 h-full flex items-center">
-                                {portalNode}
-                            </div>
-                            <div className="w-[1px] h-6 bg-slate-200/80 mx-1 origin-center" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
                 {/* Logo / Avatar dropdown area */}
                 <DropdownMenu.Root>
                     <DropdownMenu.Trigger asChild>
@@ -82,33 +70,50 @@ export default function DynamicIslandNav() {
 
                     <DropdownMenu.Portal>
                         <DropdownMenu.Content
-                            className="z-[100] mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-100 p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+                            className="z-[100] mt-2 w-48 bg-popover/95 backdrop-blur-xl rounded-2xl shadow-lg border border-border p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
                             sideOffset={8}
                         >
-                            <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-slate-500 truncate">
+                            <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground truncate">
                                 {user?.email || 'My Account'}
                             </DropdownMenu.Label>
-                            <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-slate-100" />
+                            <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-border" />
 
-                            <DropdownMenu.Item disabled className="relative flex cursor-default select-none items-center rounded-xl px-2 py-2 text-sm outline-none transition-colors focus:bg-slate-100 focus:text-slate-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
+                            <DropdownMenu.Item disabled className="relative flex cursor-default select-none items-center rounded-xl px-2 py-2 text-sm outline-none transition-colors focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
                                 User Settings
                             </DropdownMenu.Item>
 
-                            <DropdownMenu.Item disabled className="relative flex cursor-default select-none items-center rounded-xl px-2 py-2 text-sm outline-none transition-colors focus:bg-slate-100 focus:text-slate-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
-                                Theme
-                            </DropdownMenu.Item>
-
-                            <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-slate-100" />
+                            <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-border" />
 
                             <DropdownMenu.Item
-                                onClick={handleSignOut}
-                                className="relative flex cursor-pointer select-none items-center rounded-xl px-2 py-2 text-sm outline-none transition-colors text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-700 font-medium"
+                                onSelect={handleSignOut}
+                                className="relative flex cursor-pointer select-none items-center rounded-xl px-2 py-2 text-sm outline-none transition-colors text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30 focus:text-red-700 font-medium"
                             >
                                 Log Out
                             </DropdownMenu.Item>
                         </DropdownMenu.Content>
                     </DropdownMenu.Portal>
                 </DropdownMenu.Root>
+
+                {/* Global search — always visible */}
+                <div className="w-[1px] h-6 bg-border/80 mx-1 shrink-0" />
+                <GlobalSearch />
+
+                {/* Injected page actions (add buttons, etc.) */}
+                <AnimatePresence>
+                    {portalNode && (
+                        <motion.div
+                            initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, width: "auto", scale: 1 }}
+                            exit={{ opacity: 0, width: 0, scale: 0.8, filter: "blur(4px)" }}
+                            className="flex items-center overflow-hidden whitespace-nowrap"
+                        >
+                            <div className="w-[1px] h-6 bg-border/80 mx-1 origin-center" />
+                            <div className="pl-1 pr-1 h-full flex items-center">
+                                {portalNode}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <AnimatePresence>
                     {!isMobile && (
@@ -117,7 +122,7 @@ export default function DynamicIslandNav() {
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8, width: 0, margin: 0 }}
-                            className="w-[1px] h-6 bg-slate-200/80 mx-1 origin-center"
+                            className="w-[1px] h-6 bg-border/80 mx-1 origin-center"
                         />
                     )}
                 </AnimatePresence>
@@ -138,17 +143,17 @@ export default function DynamicIslandNav() {
                                 className={`relative flex items-center gap-2 rounded-full text-sm font-medium z-10 transition-colors duration-200
                                     ${isMobile ? 'px-3 py-3' : 'px-4 py-2.5'}
                                     ${isActive
-                                        ? 'text-blue-700'
+                                        ? 'text-accent'
                                         : isHovered
-                                            ? 'text-slate-800'
-                                            : 'text-slate-500'
+                                            ? 'text-foreground'
+                                            : 'text-muted-foreground'
                                     }`}
                                 title={isMobile ? label : undefined}
                             >
                                 {isActive && (
                                     <motion.div
                                         layoutId="active-pill"
-                                        className="absolute inset-0 bg-blue-50/80 rounded-full -z-10 shadow-[inner_0_1px_2px_rgba(0,0,0,0.02)] border border-blue-100/30"
+                                        className="absolute inset-0 bg-accent/10 rounded-full -z-10 shadow-[inner_0_1px_2px_rgba(0,0,0,0.02)] border border-accent/20"
                                         initial={false}
                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                     />
@@ -156,7 +161,7 @@ export default function DynamicIslandNav() {
                                 {!isActive && isHovered && (
                                     <motion.div
                                         layoutId="hover-pill"
-                                        className="absolute inset-0 bg-slate-100/60 rounded-full -z-10"
+                                        className="absolute inset-0 bg-muted/60 rounded-full -z-10"
                                         initial={false}
                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                     />
@@ -181,6 +186,28 @@ export default function DynamicIslandNav() {
                         )
                     })}
                 </motion.div>
+
+                {/* Theme toggle — always visible in nav */}
+                <AnimatePresence>
+                    {!isMobile && (
+                        <motion.div
+                            layout
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8, width: 0, margin: 0 }}
+                            className="w-[1px] h-6 bg-border/80 mx-1 origin-center"
+                        />
+                    )}
+                </AnimatePresence>
+
+                <motion.button
+                    layout
+                    onClick={toggleTheme}
+                    className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0"
+                    title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                >
+                    {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+                </motion.button>
             </motion.nav>
         </div>
     )

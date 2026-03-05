@@ -118,7 +118,7 @@ export default function ClientSelector({
                         onChange('', '')
                         setClientDropdownOpen(true)
                     }}
-                    className={`h-11 pr-10 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-white transition-all shadow-none ${displayError ? 'border-destructive/50 focus-visible:ring-destructive' : ''}`}
+                    className={`h-11 pr-10 rounded-xl bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background transition-all shadow-none ${displayError ? 'border-destructive/50 focus-visible:ring-destructive' : ''}`}
                 />
                 <button
                     type="button"
@@ -132,7 +132,7 @@ export default function ClientSelector({
             </div>
 
             {clientDropdownOpen && (
-                <div className="absolute top-[100%] left-0 z-10 w-full mt-1 border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-md bg-white">
+                <div className="absolute top-[100%] left-0 z-10 w-full mt-1 border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto shadow-md bg-popover">
                     {filteredClients.map((c) => (
                         <button
                             key={c.id}

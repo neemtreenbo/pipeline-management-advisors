@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Plus, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOrg } from '@/contexts/OrgContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 type SortField = 'name' | 'source' | 'email' | 'phone'
 
@@ -59,13 +59,12 @@ function formatSource(src: string | null) {
 
 export default function ClientsPage() {
     const { user } = useAuth()
+    const { orgId } = useOrg()
     const navigate = useNavigate()
     const { setPortalNode } = usePageActions()
 
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
-    const [search, setSearch] = useState('')
-    const [orgId, setOrgId] = useState<string | null>(null)
 
     // Inline edit state (existing rows)
     const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null)
@@ -82,33 +81,21 @@ export default function ClientsPage() {
     const [sortField, setSortField] = useState<SortField>('name')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-    const fetchOrgAndClients = useCallback(async () => {
+    const fetchClients = useCallback(async () => {
+        if (!orgId) return
         setLoading(true)
-        const { data: membership } = await supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user!.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-
-        if (!membership) { setLoading(false); return }
-        setOrgId(membership.org_id)
-
         const { data } = await supabase
             .from('clients')
             .select('*')
-            .eq('org_id', membership.org_id)
+            .eq('org_id', orgId)
             .order('name', { ascending: true })
-
         setClients(data ?? [])
         setLoading(false)
-    }, [user])
+    }, [orgId])
 
     useEffect(() => {
-        if (!user) return
-        fetchOrgAndClients()
-    }, [user, fetchOrgAndClients])
+        fetchClients()
+    }, [fetchClients])
 
     // Focus name field when new row opens
     useEffect(() => {
@@ -144,7 +131,7 @@ export default function ClientsPage() {
         if (!error) {
             setAddingNew(false)
             setNewRow({ name: '', email: '', phone: '', source: '' })
-            fetchOrgAndClients()
+            fetchClients()
         }
         setNewRowSaving(false)
     }
@@ -152,33 +139,13 @@ export default function ClientsPage() {
     // Inject the Search and "Add" button into the Island navigation
     useEffect(() => {
         setPortalNode(
-            <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="relative hidden w-[140px] sm:block sm:w-[200px]">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        id="island-client-search"
-                        placeholder="Search clients..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="h-8 pl-8 pr-7 text-xs rounded-full bg-slate-100/80 border-transparent focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-white shadow-inner transition-all w-full"
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground bg-slate-200/50 hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                        >
-                            <X size={10} strokeWidth={2.5} />
-                        </button>
-                    )}
-                </div>
-                <Button onClick={startAddingNew} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Plus size={14} className="sm:mr-1.5" />
-                    <span className="hidden sm:inline">Add</span>
-                </Button>
-            </div>
+            <Button onClick={startAddingNew} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
+            </Button>
         )
         return () => setPortalNode(null)
-    }, [setPortalNode, search])
+    }, [setPortalNode])
 
     useEffect(() => {
         if (inlineEdit) {
@@ -216,11 +183,7 @@ export default function ClientsPage() {
         })
     }
 
-    const filtered = clients.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.email?.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone?.toLowerCase().includes(search.toLowerCase())
-    )
+    const filtered = clients
 
     const sorted = [...filtered].sort((a, b) => {
         const valA = (a[sortField] || '').toLowerCase()
@@ -249,7 +212,7 @@ export default function ClientsPage() {
                             onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : prev)}
                             onBlur={saveInlineEdit}
                             onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null) }}
-                            className="w-full text-sm bg-white border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                            className="w-full text-sm bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                         >
                             {SOURCE_OPTIONS.map(o => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -280,7 +243,7 @@ export default function ClientsPage() {
                             if (e.key === 'Escape') setInlineEdit(null)
                         }}
                         placeholder={placeholder}
-                        className="w-full text-sm bg-white border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                        className="w-full text-sm bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                     />
                 ) : (
                     <div
@@ -308,20 +271,16 @@ export default function ClientsPage() {
                 ) : !showTable ? (
                     <div className="flex flex-col items-center justify-center py-28 text-center">
                         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                            <Search size={20} className="text-muted-foreground" />
+                            <Plus size={20} className="text-muted-foreground" />
                         </div>
-                        <p className="text-sm font-medium text-foreground mb-1">{search ? 'No matches found' : 'No clients yet'}</p>
-                        <p className="text-sm text-muted-foreground mb-6">
-                            {search ? 'Try adjusting your search.' : 'Click "Add" to get started.'}
-                        </p>
-                        {!search && (
-                            <Button onClick={startAddingNew} className="rounded-xl shadow-none">
-                                <Plus size={15} /> Add your first client
-                            </Button>
-                        )}
+                        <p className="text-sm font-medium text-foreground mb-1">No clients yet</p>
+                        <p className="text-sm text-muted-foreground mb-6">Click "Add" to get started.</p>
+                        <Button onClick={startAddingNew} className="rounded-xl shadow-none">
+                            <Plus size={15} /> Add your first client
+                        </Button>
                     </div>
                 ) : (
-                    <div className="rounded-2xl border border-border bg-white shadow-sm flex flex-col">
+                    <div className="rounded-2xl border border-border bg-card shadow-sm flex flex-col">
                         {/* Table header */}
                         <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 border-b border-border bg-muted/95 backdrop-blur-sm px-5 py-2.5 sticky top-0 z-10 rounded-t-2xl">
                             {[
@@ -374,7 +333,7 @@ export default function ClientsPage() {
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-source')?.focus() }
                                             }}
                                             placeholder="Full name"
-                                            className="flex-1 text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
                                         />
                                     </div>
 
@@ -388,7 +347,7 @@ export default function ClientsPage() {
                                                 if (e.key === 'Escape') cancelAddingNew()
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-email')?.focus() }
                                             }}
-                                            className="w-full text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all text-muted-foreground"
+                                            className="w-full text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all text-muted-foreground"
                                         >
                                             {SOURCE_OPTIONS.map(o => (
                                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -409,7 +368,7 @@ export default function ClientsPage() {
                                                 if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-phone')?.focus() }
                                             }}
                                             placeholder="Email"
-                                            className="w-full text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/40"
+                                            className="w-full text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/40"
                                         />
                                     </div>
 
@@ -424,7 +383,7 @@ export default function ClientsPage() {
                                                 if (e.key === 'Escape') cancelAddingNew()
                                             }}
                                             placeholder="Phone"
-                                            className="flex-1 text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
                                         />
                                         <button
                                             onClick={saveNewRow}
