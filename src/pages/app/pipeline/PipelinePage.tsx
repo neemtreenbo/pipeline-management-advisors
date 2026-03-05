@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
@@ -25,6 +27,9 @@ interface AttachmentCounts {
 export default function PipelinePage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const dealIdFromSearch = searchParams.get('deal')
     const [deals, setDeals] = useState<Deal[]>([])
     const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
     const [loading, setLoading] = useState(true)
@@ -266,6 +271,15 @@ export default function PipelinePage() {
                     defaultStage={newDealStage}
                     onClose={() => setShowNewDeal(false)}
                     onCreated={handleNewDeal}
+                />
+            )}
+
+            {/* Deal detail opened from global search */}
+            {dealIdFromSearch && (
+                <DealDetailsModal
+                    dealId={dealIdFromSearch}
+                    onClose={() => navigate('/app/pipeline', { replace: true })}
+                    onStageChange={handleDealStageChange}
                 />
             )}
         </div>

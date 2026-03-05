@@ -13,7 +13,7 @@ interface SearchResult {
 
 const TYPE_CONFIG = {
     client: { icon: Users, label: 'Client', path: (id: string) => `/app/clients/${id}` },
-    deal: { icon: Kanban, label: 'Deal', path: (id: string) => `/app/deals/${id}` },
+    deal: { icon: Kanban, label: 'Deal', path: (id: string) => `/app/pipeline?deal=${id}` },
     task: { icon: CheckSquare, label: 'Task', path: () => `/app/tasks` },
     note: { icon: StickyNote, label: 'Note', path: (id: string) => `/app/notes/${id}` },
 }
