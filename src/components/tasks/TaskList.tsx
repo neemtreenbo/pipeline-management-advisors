@@ -8,36 +8,39 @@ interface TaskListProps {
     onToggleComplete: (task: Task) => void
     onTaskClick?: (task: Task) => void
     emptyMessage?: string
+    showClient?: boolean
+    editingTaskId?: string
+    onSaveEdit?: (task: Task, title: string, dueAt: string) => void
+    onCancelEdit?: () => void
 }
 
 export default function TaskList({
     tasks,
     onToggleComplete,
     onTaskClick,
-    emptyMessage = "No tasks found"
+    emptyMessage = 'No tasks found',
+    showClient = true,
+    editingTaskId,
+    onSaveEdit,
+    onCancelEdit,
 }: TaskListProps) {
-    const [clientsMap, setClientsMap] = useState<Record<string, { id: string, name: string }>>({})
+    const [clientsMap, setClientsMap] = useState<Record<string, { id: string; name: string }>>({})
 
     useEffect(() => {
         async function loadClients() {
-            if (!tasks || tasks.length === 0) {
-                setClientsMap({})
-                return
-            }
+            if (!tasks || tasks.length === 0) { setClientsMap({}); return }
             try {
-                const taskIds = tasks.map(t => t.id)
-                const infos = await getClientsForTasks(taskIds)
-                const cMap: Record<string, { id: string, name: string }> = {}
-                infos.forEach(i => {
-                    cMap[i.taskId] = { id: i.clientId, name: i.clientName }
-                })
+                const infos = await getClientsForTasks(tasks.map(t => t.id))
+                const cMap: Record<string, { id: string; name: string }> = {}
+                infos.forEach(i => { cMap[i.taskId] = { id: i.clientId, name: i.clientName } })
                 setClientsMap(cMap)
-            } catch (error) {
-                console.error('Failed to load clients', error)
+            } catch (err) {
+                console.error('Failed to load clients', err)
             }
         }
         loadClients()
     }, [tasks])
+
     if (!tasks || tasks.length === 0) {
         return (
             <div className="p-8 text-center bg-white rounded-xl border border-dashed border-border flex flex-col items-center justify-center min-h-[150px]">
@@ -53,8 +56,12 @@ export default function TaskList({
                     key={task.id}
                     task={task}
                     client={clientsMap[task.id]}
+                    showClient={showClient}
+                    isEditing={editingTaskId === task.id}
                     onToggleComplete={onToggleComplete}
                     onClick={onTaskClick}
+                    onSaveEdit={onSaveEdit}
+                    onCancelEdit={onCancelEdit}
                 />
             ))}
         </div>

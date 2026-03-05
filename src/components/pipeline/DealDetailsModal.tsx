@@ -179,44 +179,65 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                     <div className="shrink-0 border-b border-border/60">
                         <div className="px-6 pt-5 pb-4">
                             <div className="flex items-start justify-between gap-3">
-                                {/* Left: title + client */}
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-muted-foreground/40 shrink-0">
-                                            {getDealIcon(title, 13)}
-                                        </span>
-                                        {editingTitle ? (
-                                            <input
-                                                autoFocus
-                                                className="text-[15px] font-semibold text-foreground bg-transparent border-0 border-b border-foreground/20 focus:ring-0 outline-none w-full transition-colors"
-                                                value={titleDraft}
-                                                onChange={(e) => setTitleDraft(e.target.value)}
-                                                onBlur={handleTitleSave}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') handleTitleSave()
-                                                    if (e.key === 'Escape') setEditingTitle(false)
-                                                }}
-                                            />
-                                        ) : (
-                                            <h1
-                                                className="text-[15px] font-semibold text-foreground truncate cursor-pointer hover:text-foreground/70 transition-colors"
-                                                onClick={() => { setTitleDraft(title); setEditingTitle(true) }}
+                                {/* Left: avatar + title + client */}
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    {/* Client avatar */}
+                                    {deal.client && (
+                                        <div className="shrink-0 mt-0.5">
+                                            {deal.client.profile_picture_url ? (
+                                                <img
+                                                    src={deal.client.profile_picture_url}
+                                                    alt={deal.client.name}
+                                                    className="w-9 h-9 rounded-full object-cover border border-border/40"
+                                                />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center border border-border/40">
+                                                    <span className="text-[13px] font-medium text-muted-foreground">
+                                                        {deal.client.name.charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                            <span className="text-muted-foreground/40 shrink-0">
+                                                {getDealIcon(title, 12)}
+                                            </span>
+                                            {editingTitle ? (
+                                                <input
+                                                    autoFocus
+                                                    className="text-[15px] font-semibold text-foreground bg-transparent border-0 border-b border-foreground/20 focus:ring-0 outline-none w-full transition-colors"
+                                                    value={titleDraft}
+                                                    onChange={(e) => setTitleDraft(e.target.value)}
+                                                    onBlur={handleTitleSave}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleTitleSave()
+                                                        if (e.key === 'Escape') setEditingTitle(false)
+                                                    }}
+                                                />
+                                            ) : (
+                                                <h1
+                                                    className="text-[15px] font-semibold text-foreground truncate cursor-pointer hover:text-foreground/70 transition-colors"
+                                                    onClick={() => { setTitleDraft(title); setEditingTitle(true) }}
+                                                >
+                                                    {title}
+                                                </h1>
+                                            )}
+                                        </div>
+
+                                        {deal.client && (
+                                            <Link
+                                                to={`/app/clients/${deal.client.id}`}
+                                                className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-accent transition-colors w-fit"
+                                                onClick={onClose}
                                             >
-                                                {title}
-                                            </h1>
+                                                <User size={10} />
+                                                {deal.client.name}
+                                            </Link>
                                         )}
                                     </div>
-
-                                    {deal.client && (
-                                        <Link
-                                            to={`/app/clients/${deal.client.id}`}
-                                            className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-accent transition-colors w-fit"
-                                            onClick={onClose}
-                                        >
-                                            <User size={10} />
-                                            {deal.client.name}
-                                        </Link>
-                                    )}
                                 </div>
 
                                 {/* Right: stage + close */}
@@ -333,7 +354,7 @@ export default function DealDetailsModal({ dealId, onClose }: DealDetailsModalPr
                             />
                         )}
                         {activeTab === 'notes' && dealId && orgId && (
-                            <NotesList entityType="deal" entityId={dealId} orgId={orgId} />
+                            <NotesList entityType="deal" entityId={dealId} orgId={orgId} inlineAdd />
                         )}
                         {activeTab === 'activity' && (
                             <ActivityTimeline activities={activities} />

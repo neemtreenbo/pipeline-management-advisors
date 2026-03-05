@@ -18,6 +18,12 @@ function todayString() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function toISO(dateStr: string) {
+    if (!dateStr) return null
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
+}
+
 export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: EntityTasksProps) {
     const { user } = useAuth()
     const [tasks, setTasks] = useState<Task[]>([])
@@ -25,12 +31,15 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
 
     // Inline add state
     const [adding, setAdding] = useState(false)
-    const [title, setTitle] = useState('')
-    const [dueAt, setDueAt] = useState(todayString())
-    const [saving, setSaving] = useState(false)
-    const titleRef = useRef<HTMLInputElement>(null)
+    const [addTitle, setAddTitle] = useState('')
+    const [addDue, setAddDue] = useState(todayString())
+    const [addSaving, setAddSaving] = useState(false)
+    const addTitleRef = useRef<HTMLInputElement>(null)
 
-    // Dialog state (edit only)
+    // Inline edit state
+    const [editingTaskId, setEditingTaskId] = useState<string | undefined>()
+
+    // Dialog state (non-inline mode only)
     const [taskToEdit, setTaskToEdit] = useState<Task | undefined>()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -67,48 +76,62 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
     }
 
     function openInlineAdd() {
-        setTitle('')
-        setDueAt(todayString())
+        setEditingTaskId(undefined)
+        setAddTitle('')
+        setAddDue(todayString())
         setAdding(true)
-        setTimeout(() => titleRef.current?.focus(), 0)
+        setTimeout(() => addTitleRef.current?.focus(), 0)
     }
 
     function cancelInlineAdd() {
         setAdding(false)
-        setTitle('')
+        setAddTitle('')
     }
 
-    async function handleInlineSave() {
-        if (!user || !title.trim()) return
-        setSaving(true)
+    async function handleInlineAdd() {
+        if (!user || !addTitle.trim()) return
+        setAddSaving(true)
         try {
-            const [year, month, day] = dueAt.split('-').map(Number)
-            const dueAtISO = dueAt
-                ? new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
-                : null
-
             const taskInput: TaskInsert = {
                 org_id: orgId,
                 owner_id: user.id,
                 assignee_id: user.id,
-                title: title.trim(),
+                title: addTitle.trim(),
                 description: null,
                 status: 'todo',
-                due_at: dueAtISO,
+                due_at: toISO(addDue),
             }
-
             const links: { toId: string; toType: string }[] = []
             if (clientId) links.push({ toId: clientId, toType: 'client' })
             if (dealId) links.push({ toId: dealId, toType: 'deal' })
-
             await createTask(taskInput, links)
             await loadTasks()
             setAdding(false)
-            setTitle('')
+            setAddTitle('')
         } catch (err) {
             console.error('Failed to create task', err)
         } finally {
-            setSaving(false)
+            setAddSaving(false)
+        }
+    }
+
+    async function handleInlineEdit(task: Task, title: string, dueAt: string) {
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
+        setEditingTaskId(undefined)
+        try {
+            await updateTask(task.id, { title, due_at: toISO(dueAt) })
+        } catch {
+            setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+        }
+    }
+
+    function handleTaskClick(task: Task) {
+        if (inlineAdd) {
+            setAdding(false)
+            setEditingTaskId(task.id)
+        } else {
+            setTaskToEdit(task)
+            setIsDialogOpen(true)
         }
     }
 
@@ -116,34 +139,33 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
         return <div className="py-8 text-center text-sm text-muted-foreground/40 animate-pulse">Loading…</div>
     }
 
-    // Inline add form row
-    const inlineForm = (
+    const inlineAddForm = (
         <div className="flex items-center gap-2 bg-white border border-border/60 rounded-xl px-3 py-2.5">
             <input
-                ref={titleRef}
+                ref={addTitleRef}
                 className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/40 text-foreground"
                 placeholder="Task title…"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                value={addTitle}
+                onChange={(e) => setAddTitle(e.target.value)}
                 onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleInlineSave()
+                    if (e.key === 'Enter') handleInlineAdd()
                     if (e.key === 'Escape') cancelInlineAdd()
                 }}
-                disabled={saving}
+                disabled={addSaving}
             />
             <input
                 type="date"
                 className="text-[12px] text-muted-foreground bg-transparent outline-none border-0 cursor-pointer"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-                disabled={saving}
+                value={addDue}
+                onChange={(e) => setAddDue(e.target.value)}
+                disabled={addSaving}
             />
             <button
-                onClick={handleInlineSave}
-                disabled={saving || !title.trim()}
+                onClick={handleInlineAdd}
+                disabled={addSaving || !addTitle.trim()}
                 className="text-[12px] font-medium text-accent hover:text-accent/80 disabled:text-muted-foreground/30 transition-colors px-1"
             >
-                {saving ? 'Saving…' : 'Add'}
+                {addSaving ? 'Saving…' : 'Add'}
             </button>
             <button
                 onClick={cancelInlineAdd}
@@ -156,9 +178,9 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
 
     return (
         <div className="flex flex-col gap-2">
-            {/* Add button / inline form */}
+            {/* Add trigger */}
             {inlineAdd ? (
-                adding ? inlineForm : (
+                adding ? inlineAddForm : (
                     <button
                         onClick={openInlineAdd}
                         className="flex items-center gap-1.5 text-[12px] text-muted-foreground/50 hover:text-foreground transition-colors py-1 w-fit"
@@ -179,7 +201,7 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
                 </div>
             )}
 
-            {/* Task list or empty state */}
+            {/* Task list */}
             {tasks.length === 0 && !adding ? (
                 <div className="py-8 text-center text-[13px] text-muted-foreground/40">
                     No tasks yet
@@ -188,20 +210,26 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd }: Enti
                 <TaskList
                     tasks={tasks}
                     onToggleComplete={handleToggleComplete}
-                    onTaskClick={(t) => { setTaskToEdit(t); setIsDialogOpen(true) }}
+                    onTaskClick={handleTaskClick}
+                    showClient={!inlineAdd}
+                    editingTaskId={editingTaskId}
+                    onSaveEdit={handleInlineEdit}
+                    onCancelEdit={() => setEditingTaskId(undefined)}
                 />
             )}
 
-            {/* Dialog for editing only */}
-            <TaskDialog
-                isOpen={isDialogOpen}
-                onClose={() => setIsDialogOpen(false)}
-                onSaved={loadTasks}
-                orgId={orgId}
-                taskToEdit={taskToEdit}
-                defaultClientId={clientId}
-                defaultDealId={dealId}
-            />
+            {/* Dialog for non-inline mode only */}
+            {!inlineAdd && (
+                <TaskDialog
+                    isOpen={isDialogOpen}
+                    onClose={() => setIsDialogOpen(false)}
+                    onSaved={loadTasks}
+                    orgId={orgId}
+                    taskToEdit={taskToEdit}
+                    defaultClientId={clientId}
+                    defaultDealId={dealId}
+                />
+            )}
         </div>
     )
 }

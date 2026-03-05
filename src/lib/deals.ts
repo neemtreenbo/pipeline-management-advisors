@@ -32,7 +32,7 @@ export interface Deal {
     created_at: string
     updated_at: string
     // joined
-    client?: { id: string; name: string; email: string | null }
+    client?: { id: string; name: string; email: string | null; profile_picture_url: string | null }
     _proposal_count?: number
     _attachment_count?: number
 }
@@ -53,7 +53,7 @@ export async function fetchDealsByOrg(orgId: string): Promise<Deal[]> {
         .from('deals')
         .select(`
       *,
-      client:clients(id, name, email)
+      client:clients(id, name, email, profile_picture_url)
     `)
         .eq('org_id', orgId)
         .order('order_index', { ascending: true })
@@ -69,7 +69,7 @@ export async function fetchDealById(dealId: string): Promise<Deal | null> {
         .from('deals')
         .select(`
       *,
-      client:clients(id, name, email)
+      client:clients(id, name, email, profile_picture_url)
     `)
         .eq('id', dealId)
         .maybeSingle()

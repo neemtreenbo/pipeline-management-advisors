@@ -704,13 +704,12 @@ export default function ClientDetailPage() {
 
                     {/* Tasks */}
                     < TabsContent value="tasks" >
-                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} />
-                        }
+                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} inlineAdd />}
                     </TabsContent >
 
                     {/* Notes */}
                     < TabsContent value="notes" >
-                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} />}
+                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd />}
                     </TabsContent >
 
                     {/* Activity */}
