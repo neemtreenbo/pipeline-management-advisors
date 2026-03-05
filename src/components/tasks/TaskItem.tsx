@@ -112,7 +112,7 @@ export default function TaskItem({
     return (
         <div
             onClick={() => onClick?.(task)}
-            className={`flex items-start gap-3 p-3 group cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50 transition-colors ${isCompleted ? 'opacity-50' : ''}`}
+            className={`flex items-start gap-3 p-3 group cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/40 hover:-translate-y-0.5 hover:shadow-md hover:scale-[1.005] hover:z-10 relative transition-all duration-150 ${isCompleted ? 'opacity-50' : ''}`}
         >
             <button
                 onClick={handleToggle}

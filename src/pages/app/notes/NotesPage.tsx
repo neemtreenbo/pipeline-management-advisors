@@ -65,7 +65,7 @@ function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { c
                             <Link
                                 key={note.id}
                                 to={`/app/notes/${note.id}`}
-                                className="relative flex flex-col rounded-xl border border-border bg-white p-4 group transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:border-zinc-300 overflow-hidden"
+                                className="relative flex flex-col rounded-xl border border-border bg-white p-4 group transition-all duration-150 hover:-translate-y-1 hover:shadow-md hover:scale-[1.015] hover:border-zinc-300 overflow-hidden"
                             >
                                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 

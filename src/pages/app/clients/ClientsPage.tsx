@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { usePageActions } from '@/contexts/PageActionsContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 
 type SortField = 'name' | 'source' | 'email' | 'phone'
 
@@ -40,11 +39,11 @@ const SOURCE_OPTIONS = [
 ]
 
 const SOURCE_COLORS: Record<string, string> = {
-    referral: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    walk_in: 'bg-blue-100 text-blue-700 border-blue-200',
-    social_media: 'bg-purple-100 text-purple-700 border-purple-200',
-    cold_call: 'bg-orange-100 text-orange-700 border-orange-200',
-    event: 'bg-pink-100 text-pink-700 border-pink-200',
+    referral: 'bg-muted text-muted-foreground border-border',
+    walk_in: 'bg-muted text-muted-foreground border-border',
+    social_media: 'bg-muted text-muted-foreground border-border',
+    cold_call: 'bg-muted text-muted-foreground border-border',
+    event: 'bg-muted text-muted-foreground border-border',
     other: 'bg-muted text-muted-foreground border-border',
 }
 
@@ -66,18 +65,18 @@ export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
-    const [drawerOpen, setDrawerOpen] = useState(false)
     const [orgId, setOrgId] = useState<string | null>(null)
 
-    // Inline edit state
+    // Inline edit state (existing rows)
     const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null)
     const [inlineSaving, setInlineSaving] = useState(false)
     const inlineInputRef = useRef<HTMLInputElement>(null)
 
-    // Add client form
-    const [form, setForm] = useState({ name: '', email: '', phone: '', source: '', tags: '' })
-    const [saving, setSaving] = useState(false)
-    const [formError, setFormError] = useState<string | null>(null)
+    // New inline row state
+    const [addingNew, setAddingNew] = useState(false)
+    const [newRow, setNewRow] = useState({ name: '', email: '', phone: '', source: '' })
+    const [newRowSaving, setNewRowSaving] = useState(false)
+    const newNameRef = useRef<HTMLInputElement>(null)
 
     // Sort state
     const [sortField, setSortField] = useState<SortField>('name')
@@ -108,11 +107,49 @@ export default function ClientsPage() {
 
     useEffect(() => {
         if (!user) return
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchOrgAndClients()
     }, [user, fetchOrgAndClients])
 
-    // Inject the Search and "Add Client" button into the Island navigation
+    // Focus name field when new row opens
+    useEffect(() => {
+        if (addingNew) {
+            setTimeout(() => newNameRef.current?.focus(), 30)
+        }
+    }, [addingNew])
+
+    function startAddingNew() {
+        setNewRow({ name: '', email: '', phone: '', source: '' })
+        setAddingNew(true)
+    }
+
+    function cancelAddingNew() {
+        setAddingNew(false)
+        setNewRow({ name: '', email: '', phone: '', source: '' })
+    }
+
+    async function saveNewRow() {
+        if (!orgId || !user || !newRow.name.trim() || newRowSaving) return
+        setNewRowSaving(true)
+
+        const { error } = await supabase.from('clients').insert({
+            org_id: orgId,
+            owner_id: user.id,
+            name: newRow.name.trim(),
+            email: newRow.email.trim() || null,
+            phone: newRow.phone.trim() || null,
+            source: newRow.source || null,
+            tags: [],
+        })
+
+        if (!error) {
+            setAddingNew(false)
+            setNewRow({ name: '', email: '', phone: '', source: '' })
+            fetchOrgAndClients()
+        }
+        setNewRowSaving(false)
+    }
+
+    // Inject the Search and "Add" button into the Island navigation
     useEffect(() => {
         setPortalNode(
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -134,7 +171,7 @@ export default function ClientsPage() {
                         </button>
                     )}
                 </div>
-                <Button onClick={() => setDrawerOpen(true)} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                <Button onClick={startAddingNew} id="nav-add-client-btn" className="h-8 text-xs sm:text-xs rounded-full shadow-sm px-3 font-medium bg-primary text-primary-foreground hover:bg-primary/90">
                     <Plus size={14} className="sm:mr-1.5" />
                     <span className="hidden sm:inline">Add</span>
                 </Button>
@@ -149,41 +186,12 @@ export default function ClientsPage() {
         }
     }, [inlineEdit])
 
-    async function handleAddClient(e: React.FormEvent) {
-        e.preventDefault()
-        if (!orgId || !user) return
-        if (!form.name.trim()) { setFormError('Name is required.'); return }
-
-        setSaving(true)
-        setFormError(null)
-
-        const tagsArr = form.tags.split(',').map(t => t.trim()).filter(Boolean)
-
-        const { error } = await supabase.from('clients').insert({
-            org_id: orgId,
-            owner_id: user.id,
-            name: form.name.trim(),
-            email: form.email.trim() || null,
-            phone: form.phone.trim() || null,
-            source: form.source.trim() || null,
-            tags: tagsArr,
-        })
-
-        if (error) { setFormError(error.message); setSaving(false); return }
-
-        setForm({ name: '', email: '', phone: '', source: '', tags: '' })
-        setDrawerOpen(false)
-        fetchOrgAndClients()
-        setSaving(false)
-    }
-
     async function saveInlineEdit() {
         if (!inlineEdit || inlineSaving) return
         setInlineSaving(true)
 
         const { id, field, value } = inlineEdit
         const patch: Record<string, string | null> = { [field]: value.trim() || null }
-        // name cannot be null
         if (field === 'name' && !value.trim()) {
             setInlineEdit(null)
             setInlineSaving(false)
@@ -232,17 +240,16 @@ export default function ClientsPage() {
         const isEditing = inlineEdit?.id === client.id && inlineEdit?.field === field
 
         if (field === 'source') {
-            const isEditingSource = isEditing
             return (
                 <div className="relative group/cell">
-                    {isEditingSource ? (
+                    {isEditing ? (
                         <select
                             autoFocus
                             value={inlineEdit?.value ?? ''}
                             onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : prev)}
                             onBlur={saveInlineEdit}
                             onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null) }}
-                            className="w-full text-sm bg-white border border-primary/30 rounded-lg px-2 py-1 outline-none shadow-sm focus:ring-1 focus:ring-primary/20"
+                            className="w-full text-sm bg-white border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                         >
                             {SOURCE_OPTIONS.map(o => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -273,7 +280,7 @@ export default function ClientsPage() {
                             if (e.key === 'Escape') setInlineEdit(null)
                         }}
                         placeholder={placeholder}
-                        className="w-full text-sm bg-white border border-primary/30 rounded-lg px-2 py-1 outline-none shadow-sm focus:ring-1 focus:ring-primary/20"
+                        className="w-full text-sm bg-white border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
                     />
                 ) : (
                     <div
@@ -287,9 +294,10 @@ export default function ClientsPage() {
         )
     }
 
+    const showTable = !loading && (sorted.length > 0 || addingNew)
+
     return (
         <div className="min-h-screen bg-transparent pt-4">
-            {/* Table */}
             <div className="max-w-5xl mx-auto px-6 pb-8">
                 {loading ? (
                     <div className="flex flex-col gap-2">
@@ -297,17 +305,17 @@ export default function ClientsPage() {
                             <div key={i} className="h-12 rounded-xl bg-muted/50 animate-pulse" />
                         ))}
                     </div>
-                ) : filtered.length === 0 ? (
+                ) : !showTable ? (
                     <div className="flex flex-col items-center justify-center py-28 text-center">
                         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                             <Search size={20} className="text-muted-foreground" />
                         </div>
                         <p className="text-sm font-medium text-foreground mb-1">{search ? 'No matches found' : 'No clients yet'}</p>
                         <p className="text-sm text-muted-foreground mb-6">
-                            {search ? 'Try adjusting your search.' : 'Click "Add Client" to get started.'}
+                            {search ? 'Try adjusting your search.' : 'Click "Add" to get started.'}
                         </p>
                         {!search && (
-                            <Button onClick={() => setDrawerOpen(true)} className="rounded-xl shadow-none">
+                            <Button onClick={startAddingNew} className="rounded-xl shadow-none">
                                 <Plus size={15} /> Add your first client
                             </Button>
                         )}
@@ -348,10 +356,97 @@ export default function ClientsPage() {
                         </div>
 
                         <div className="flex flex-col">
+                            {/* New inline row */}
+                            {addingNew && (
+                                <div className="grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 px-5 py-2.5 items-center border-b border-border bg-muted/30">
+                                    {/* Name */}
+                                    <div className="pr-4 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
+                                            <span className="text-[11px] font-medium text-muted-foreground/50">—</span>
+                                        </div>
+                                        <input
+                                            ref={newNameRef}
+                                            value={newRow.name}
+                                            onChange={e => setNewRow(r => ({ ...r, name: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                                if (e.key === 'Escape') cancelAddingNew()
+                                                if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-source')?.focus() }
+                                            }}
+                                            placeholder="Full name"
+                                            className="flex-1 text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                        />
+                                    </div>
+
+                                    {/* Source */}
+                                    <div className="pr-4">
+                                        <select
+                                            id="new-source"
+                                            value={newRow.source}
+                                            onChange={e => setNewRow(r => ({ ...r, source: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Escape') cancelAddingNew()
+                                                if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-email')?.focus() }
+                                            }}
+                                            className="w-full text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all text-muted-foreground"
+                                        >
+                                            {SOURCE_OPTIONS.map(o => (
+                                                <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Email */}
+                                    <div className="pr-4">
+                                        <input
+                                            id="new-email"
+                                            type="email"
+                                            value={newRow.email}
+                                            onChange={e => setNewRow(r => ({ ...r, email: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                                if (e.key === 'Escape') cancelAddingNew()
+                                                if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-phone')?.focus() }
+                                            }}
+                                            placeholder="Email"
+                                            className="w-full text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/40"
+                                        />
+                                    </div>
+
+                                    {/* Phone + actions */}
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            id="new-phone"
+                                            value={newRow.phone}
+                                            onChange={e => setNewRow(r => ({ ...r, phone: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                                if (e.key === 'Escape') cancelAddingNew()
+                                            }}
+                                            placeholder="Phone"
+                                            className="flex-1 text-sm bg-white border border-border rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all min-w-0 placeholder:text-muted-foreground/40"
+                                        />
+                                        <button
+                                            onClick={saveNewRow}
+                                            disabled={!newRow.name.trim() || newRowSaving}
+                                            className="shrink-0 w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            <Check size={13} strokeWidth={2.5} />
+                                        </button>
+                                        <button
+                                            onClick={cancelAddingNew}
+                                            className="shrink-0 w-7 h-7 rounded-full bg-muted border border-border text-muted-foreground flex items-center justify-center hover:bg-muted/70 transition-colors"
+                                        >
+                                            <X size={13} strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {sorted.map((client, idx) => (
                                 <div
                                     key={client.id}
-                                    className={`grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 px-5 py-3 items-center ${idx < sorted.length - 1 ? 'border-b border-border/50' : ''} hover:bg-muted/30 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 group`}
+                                    className={`grid grid-cols-[2.8fr_1.2fr_1.5fr_1.5fr] gap-0 px-5 py-3 items-center ${idx < sorted.length - 1 ? 'border-b border-border/50' : ''} hover:bg-muted/40 hover:-translate-y-1 hover:shadow-md hover:scale-[1.005] hover:z-10 relative transition-all duration-150 group`}
                                 >
                                     {/* Name */}
                                     <div
@@ -365,7 +460,7 @@ export default function ClientsPage() {
                                                 <span className="text-xs font-bold text-primary">{getInitials(client.name)}</span>
                                             )}
                                         </div>
-                                        <span className="text-sm font-medium text-foreground truncate group-hover:underline">{client.name}</span>
+                                        <span className="text-sm font-medium text-foreground truncate">{client.name}</span>
                                     </div>
 
                                     {/* Source */}
@@ -423,66 +518,6 @@ export default function ClientsPage() {
                     </div>
                 )}
             </div>
-
-            {/* Add Client Drawer */}
-            {drawerOpen && (
-                <>
-                    <div className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-                    <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white border-l border-border shadow-xl z-50 flex flex-col">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                            <h2 className="text-base font-semibold text-foreground">New Client</h2>
-                            <button onClick={() => setDrawerOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAddClient} className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="client-name">Full Name *</Label>
-                                <Input id="client-name" placeholder="e.g. Maria Santos" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="client-email">Email</Label>
-                                <Input id="client-email" type="email" placeholder="e.g. maria@example.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="client-phone">Phone</Label>
-                                <Input id="client-phone" placeholder="e.g. +63 912 345 6789" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="client-source">Source</Label>
-                                <select
-                                    id="client-source"
-                                    value={form.source}
-                                    onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-                                    className="flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
-                                >
-                                    {SOURCE_OPTIONS.map(o => (
-                                        <option key={o.value} value={o.value}>{o.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="client-tags">Tags</Label>
-                                <Input id="client-tags" placeholder="e.g. VIP, prospect (comma-separated)" value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} />
-                                <p className="text-xs text-muted-foreground">Separate multiple tags with commas.</p>
-                            </div>
-
-                            {formError && (
-                                <p className="text-sm text-destructive bg-red-50 border border-red-100 rounded-lg px-3 py-2">{formError}</p>
-                            )}
-
-                            <div className="mt-auto flex gap-3 pt-4 border-t border-border">
-                                <Button type="button" variant="secondary" className="flex-1" onClick={() => setDrawerOpen(false)}>Cancel</Button>
-                                <Button type="submit" className="flex-1" disabled={saving} id="save-client-btn">
-                                    <Check size={14} />
-                                    {saving ? 'Saving...' : 'Save Client'}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                </>
-            )}
         </div>
     )
 }

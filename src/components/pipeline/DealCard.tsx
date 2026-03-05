@@ -58,7 +58,7 @@ export default function DealCard({
                             onClick={() => setIsModalOpen(true)}
                             className={[
                                 'p-3 cursor-pointer select-none bg-white border-border/60',
-                                'hover:border-border hover:shadow-sm',
+                                'hover:border-border hover:shadow-md hover:-translate-y-1 hover:scale-[1.015]',
                                 'transition-all duration-150',
                                 snapshot.isDragging
                                     ? 'opacity-80 scale-[1.02] shadow-lg rotate-[0.5deg]'
