@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Paperclip, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Paperclip } from 'lucide-react'
 import { Draggable } from '@hello-pangea/dnd'
 import type { Deal, DealStage } from '@/lib/deals'
 import { Card } from '@/components/ui/card'
@@ -35,6 +35,10 @@ export default function DealCard({
 
     const hasProposal = proposalCount > 0
     const needsProposal = STAGES_NEEDING_PROPOSAL.includes(deal.stage) && !hasProposal
+    const formattedValue = deal.value > 0 ? formatCurrency(deal.value) : null
+    const closeDate = deal.expected_close_date
+        ? new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+        : null
 
     return (
         <>
@@ -44,69 +48,75 @@ export default function DealCard({
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        className="select-none relative z-10"
+                        className="select-none"
                         style={provided.draggableProps.style}
                     >
                         <Card
                             id={`deal-card-${deal.id}`}
                             onClick={() => setIsModalOpen(true)}
                             className={[
-                                'p-3 cursor-pointer select-none relative h-full',
-                                'hover:border-zinc-300 hover:shadow-md',
+                                'p-3 cursor-pointer select-none bg-white border-border/60',
+                                'hover:border-border hover:shadow-sm',
                                 'transition-all duration-150',
-                                snapshot.isDragging ? 'opacity-90 scale-[1.02] rotate-1 shadow-xl border-primary ring-1 ring-primary/20 z-50' : '',
+                                snapshot.isDragging
+                                    ? 'opacity-80 scale-[1.02] shadow-lg rotate-[0.5deg]'
+                                    : '',
                             ].join(' ')}
                         >
-                            {/* Client name */}
-                            <p className="text-xs text-muted-foreground truncate mb-0.5">{clientName}</p>
+                            {/* Client label */}
+                            <p className="text-[10px] font-medium tracking-wider uppercase text-muted-foreground/60 truncate mb-1.5">
+                                {clientName}
+                            </p>
 
-                            {/* Deal title or fallback */}
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-muted-foreground shrink-0 shadow-sm border border-border/50 bg-muted/30 rounded p-0.5">
-                                    {getDealIcon(title || '', 12)}
+                            {/* Deal title with inline icon */}
+                            <div className="flex items-start gap-1.5">
+                                <span className="text-muted-foreground/40 shrink-0 mt-px">
+                                    {getDealIcon(title || '', 11)}
                                 </span>
-                                <h3 className="text-sm font-semibold text-foreground leading-tight truncate">
+                                <h3 className="text-[13px] font-medium text-foreground leading-snug">
                                     {title || clientName}
                                 </h3>
                             </div>
 
                             {/* Value */}
-                            {deal.value > 0 && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    {formatCurrency(deal.value)}
+                            {formattedValue && (
+                                <p className="text-xs text-foreground/50 font-medium mt-1.5 tabular-nums">
+                                    {formattedValue}
                                 </p>
                             )}
 
-                            {/* Badges row */}
-                            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                                {/* Proposal badge */}
-                                {hasProposal && (
-                                    <span className="flex items-center gap-1 text-[11px] font-medium text-success">
-                                        <CheckCircle2 size={11} />
-                                        Proposal ✓
-                                    </span>
-                                )}
-                                {needsProposal && (
-                                    <span className="flex items-center gap-1 text-[11px] font-medium text-warning">
-                                        <AlertTriangle size={11} />
-                                        Proposal missing
-                                    </span>
-                                )}
+                            {/* Footer row */}
+                            {(hasProposal || needsProposal || attachmentCount > 0 || closeDate) && (
+                                <div className="flex items-center gap-3 mt-2.5">
+                                    {/* Proposal status */}
+                                    {hasProposal && (
+                                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-success/70 shrink-0" />
+                                            Proposal
+                                        </span>
+                                    )}
+                                    {needsProposal && (
+                                        <span className="flex items-center gap-1 text-[11px] text-warning/80">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-warning/60 shrink-0" />
+                                            Missing
+                                        </span>
+                                    )}
 
-                                {/* Attachment count */}
-                                {attachmentCount > 0 && (
-                                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground ml-auto">
-                                        <Paperclip size={11} />
-                                        {attachmentCount}
-                                    </span>
-                                )}
-                            </div>
+                                    {/* Close date */}
+                                    {closeDate && (
+                                        <span className="text-[11px] text-muted-foreground/50">
+                                            {closeDate}
+                                        </span>
+                                    )}
 
-                            {/* Expected close */}
-                            {deal.expected_close_date && (
-                                <p className="text-[11px] text-muted-foreground mt-1.5">
-                                    Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-                                </p>
+                                    {/* Attachments */}
+                                    {attachmentCount > 0 && (
+                                        <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/50 ml-auto">
+                                            <Paperclip size={10} />
+                                            {attachmentCount}
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </Card>
                     </div>
