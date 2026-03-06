@@ -76,7 +76,7 @@ export default memo(function KanbanColumn({
 
     return (
         <div
-            className="flex flex-col bg-black/[0.06] dark:bg-muted/50 rounded-xl min-w-[280px] w-72 shrink-0 max-h-[calc(100vh-140px)]"
+            className="flex flex-col bg-black/[0.03] dark:bg-muted/50 rounded-xl min-w-[280px] w-72 shrink-0 max-h-[calc(100vh-140px)] shadow-sm dark:shadow-black/20"
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
             {/* Column header — always visible */}

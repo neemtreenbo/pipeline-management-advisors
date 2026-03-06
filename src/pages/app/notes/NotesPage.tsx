@@ -161,7 +161,13 @@ export default function NotesPage() {
         <div className="min-h-screen bg-transparent">
             <div className="max-w-5xl mx-auto px-6 pb-8">
 
-                <div className="sticky top-0 z-20 bg-background pt-6 pb-5">
+                <div
+                    className="sticky top-0 z-20 pt-6 pb-5"
+                    style={{
+                        background: `radial-gradient(circle at top left, rgba(59,130,246,0.04), transparent 50%), radial-gradient(circle at bottom right, rgba(147,51,234,0.04), transparent 50%), hsl(var(--background))`,
+                        backgroundAttachment: 'fixed',
+                    }}
+                >
                     <div className="flex items-center justify-between h-8">
                         <h1 className="text-lg font-semibold text-foreground leading-none flex items-center gap-2">
                             Notes
