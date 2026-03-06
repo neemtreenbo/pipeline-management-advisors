@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom'
 import ClientAvatar from '@/components/pipeline/ClientAvatar'
 import type { ClientNodeData } from '@/hooks/useGraphData'
 
+const handleStyle = {
+  width: 10,
+  height: 10,
+  background: 'hsl(var(--accent))',
+  border: '2px solid hsl(var(--background))',
+  opacity: 0,
+  transition: 'opacity 0.15s ease',
+}
+
 export default memo(function ClientNode({ data }: NodeProps<Node<ClientNodeData>>) {
   const navigate = useNavigate()
 
@@ -11,7 +20,7 @@ export default memo(function ClientNode({ data }: NodeProps<Node<ClientNodeData>
     <div
       onClick={() => navigate(`/app/clients/${data.clientId}`)}
       className={`
-        flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer
+        group flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer
         transition-shadow duration-150 hover:shadow-md select-none
         bg-card text-card-foreground
         ${data.isFocused
@@ -21,7 +30,12 @@ export default memo(function ClientNode({ data }: NodeProps<Node<ClientNodeData>
       `}
       style={{ minWidth: 120, maxWidth: 200 }}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+        className="!opacity-0 group-hover:!opacity-100"
+      />
       <ClientAvatar
         name={data.name}
         profilePictureUrl={data.profilePictureUrl}
@@ -30,7 +44,12 @@ export default memo(function ClientNode({ data }: NodeProps<Node<ClientNodeData>
       <span className="text-xs font-medium text-foreground truncate leading-tight">
         {data.name}
       </span>
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+        className="!opacity-0 group-hover:!opacity-100"
+      />
     </div>
   )
 })

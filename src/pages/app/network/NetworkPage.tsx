@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { Plus, X, RotateCcw } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
+import { Plus, RotateCcw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useOrg } from '@/contexts/OrgContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,18 +10,10 @@ import {
   useResetNetworkPositions,
 } from '@/hooks/queries/useClients'
 import { useOrgGraphData } from '@/hooks/useGraphData'
-import { addClientRelationship, type ClientRelationType, type NetworkPositions } from '@/lib/clientRelationships'
+import { addClientRelationship, removeClientRelationship, type ClientRelationType, type NetworkPositions } from '@/lib/clientRelationships'
 import { queryKeys } from '@/lib/queryKeys'
 import RelationshipGraph from '@/components/graph/RelationshipGraph'
-import ClientSelector from '@/components/ui/ClientSelector'
-
-const RELATION_TYPES: { value: ClientRelationType; label: string }[] = [
-  { value: 'spouse', label: 'Spouse' },
-  { value: 'child', label: 'Child' },
-  { value: 'family', label: 'Family' },
-  { value: 'friend', label: 'Friend' },
-  { value: 'referred_by', label: 'Referred By' },
-]
+import AddClientPopover from '@/components/graph/AddClientPopover'
 
 export default function NetworkPage() {
   const { orgId } = useOrg()
@@ -34,41 +26,68 @@ export default function NetworkPage() {
   const savePositions = useSaveNetworkPositions(orgId ?? undefined, user?.id)
   const resetPositions = useResetNetworkPositions(orgId ?? undefined, user?.id)
 
-  const [showForm, setShowForm] = useState(false)
-  const [clientAId, setClientAId] = useState('')
-  const [clientBId, setClientBId] = useState('')
-  const [relationType, setRelationType] = useState<ClientRelationType>('friend')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Floating "+" button popover state
+  const [showAddPopover, setShowAddPopover] = useState(false)
+  const addBtnRef = useRef<HTMLButtonElement>(null)
 
-  function resetForm() {
-    setClientAId('')
-    setClientBId('')
-    setRelationType('friend')
-    setError(null)
-    setShowForm(false)
+  function invalidateNetwork(clientAId?: string, clientBId?: string) {
+    if (!orgId) return
+    qc.invalidateQueries({ queryKey: queryKeys.clients.network(orgId) })
+    if (clientAId) qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientAId) })
+    if (clientBId) qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientBId) })
   }
 
-  async function handleAdd() {
-    if (!clientAId || !clientBId || !orgId || !user) return
-    if (clientAId === clientBId) {
-      setError('Cannot link a client to themselves')
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      await addClientRelationship(orgId, clientAId, clientBId, relationType, user.id)
-      qc.invalidateQueries({ queryKey: queryKeys.clients.network(orgId) })
-      qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientAId) })
-      qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientBId) })
-      resetForm()
-    } catch (err: unknown) {
-      setError((err as Error).message || 'Failed to add relationship')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const handleCreateRelationship = useCallback(
+    async (sourceId: string, targetId: string, relationType: ClientRelationType) => {
+      if (!orgId || !user) return
+      try {
+        await addClientRelationship(orgId, sourceId, targetId, relationType, user.id)
+        invalidateNetwork(sourceId, targetId)
+      } catch {
+        // silently fail — user can retry
+      }
+    },
+    [orgId, user]
+  )
+
+  const handleAddClient = useCallback(
+    async (clientId: string, relationType: ClientRelationType | null, sourceNodeId: string | null) => {
+      if (!orgId || !user) return
+      if (sourceNodeId && relationType) {
+        try {
+          await addClientRelationship(orgId, sourceNodeId, clientId, relationType, user.id)
+          invalidateNetwork(sourceNodeId, clientId)
+        } catch {
+          // silently fail
+        }
+      } else {
+        // Adding standalone node — just invalidate to refetch (node will appear if it has any relationships)
+        invalidateNetwork()
+      }
+    },
+    [orgId, user]
+  )
+
+  const handleAddStandaloneClient = useCallback(
+    (clientId: string, relationType: ClientRelationType | null) => {
+      handleAddClient(clientId, relationType, null)
+      setShowAddPopover(false)
+    },
+    [handleAddClient]
+  )
+
+  const handleDeleteRelationship = useCallback(
+    async (edgeId: string) => {
+      if (!orgId) return
+      try {
+        await removeClientRelationship(edgeId)
+        invalidateNetwork()
+      } catch {
+        // silently fail
+      }
+    },
+    [orgId]
+  )
 
   const handlePositionsChange = useCallback(
     (positions: NetworkPositions) => {
@@ -97,6 +116,8 @@ export default function NetworkPage() {
     )
   }
 
+  const existingNodeIds = new Set(nodes.map((n) => n.id))
+
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
       <div className="px-6 pt-6 pb-4 flex items-center justify-between shrink-0">
@@ -104,6 +125,11 @@ export default function NetworkPage() {
           <h1 className="text-xl font-bold text-foreground">Network</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {nodes.length} clients &middot; {edges.length} relationships
+            {nodes.length > 0 && (
+              <span className="ml-2 text-muted-foreground/60">
+                &middot; Drag handles to connect
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -119,96 +145,18 @@ export default function NetworkPage() {
               Reset Layout
             </button>
           )}
-          {!showForm && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Plus size={14} />
-              Add Relationship
-            </button>
-          )}
         </div>
       </div>
 
-      {showForm && orgId && (
-        <div className="px-6 pb-4 shrink-0">
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground">Add Relationship</h3>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-3 items-end">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Client A</label>
-                <ClientSelector
-                  orgId={orgId}
-                  value={clientAId}
-                  onChange={(id) => { setClientAId(id); setError(null) }}
-                  placeholder="Search client..."
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Relationship</label>
-                <select
-                  value={relationType}
-                  onChange={(e) => setRelationType(e.target.value as ClientRelationType)}
-                  className="h-11 px-3 rounded-xl border border-border bg-muted/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {RELATION_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Client B</label>
-                <ClientSelector
-                  orgId={orgId}
-                  value={clientBId}
-                  onChange={(id) => { setClientBId(id); setError(null) }}
-                  placeholder="Search client..."
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!clientAId || !clientBId || saving}
-                className="h-11 px-4 text-sm font-medium rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-              >
-                {saving ? 'Adding...' : 'Add'}
-              </button>
-            </div>
-            {error && (
-              <p className="text-xs text-destructive mt-2">{error}</p>
-            )}
+      <div className="flex-1 px-6 pb-6 min-h-0 relative">
+        {nodes.length === 0 ? (
+          <div className="h-full rounded-xl border border-border bg-background flex flex-col items-center justify-center gap-3">
+            <p className="text-sm font-medium text-foreground">No relationships yet</p>
+            <p className="text-xs text-muted-foreground text-center max-w-xs">
+              Click the + button to add your first client, then drag from the handle dots to connect them.
+            </p>
           </div>
-        </div>
-      )}
-
-      {nodes.length === 0 && !showForm ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <p className="text-sm font-medium text-foreground">No relationships yet</p>
-          <p className="text-xs text-muted-foreground">
-            Click &quot;Add Relationship&quot; to start building your client network.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors mt-1"
-          >
-            <Plus size={14} />
-            Add Relationship
-          </button>
-        </div>
-      ) : (
-        <div className="flex-1 px-6 pb-6 min-h-0">
+        ) : (
           <RelationshipGraph
             nodes={nodes}
             edges={edges}
@@ -216,9 +164,38 @@ export default function NetworkPage() {
             className="h-full"
             savedPositions={savedPositions}
             onPositionsChange={handlePositionsChange}
+            interactive
+            orgId={orgId ?? undefined}
+            onCreateRelationship={handleCreateRelationship}
+            onAddClient={handleAddClient}
+            onDeleteRelationship={handleDeleteRelationship}
           />
+        )}
+
+        {/* Floating add button */}
+        <div className="absolute bottom-10 right-10 z-20">
+          <button
+            ref={addBtnRef}
+            type="button"
+            onClick={() => setShowAddPopover((v) => !v)}
+            className="w-11 h-11 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center"
+            title="Add client to network"
+          >
+            <Plus size={20} />
+          </button>
+          {showAddPopover && orgId && (
+            <div className="absolute bottom-14 right-0">
+              <AddClientPopover
+                orgId={orgId}
+                sourceNodeId={null}
+                existingNodeIds={existingNodeIds}
+                onAdd={handleAddStandaloneClient}
+                onClose={() => setShowAddPopover(false)}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
