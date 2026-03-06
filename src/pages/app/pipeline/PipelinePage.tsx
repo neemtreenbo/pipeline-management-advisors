@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
@@ -12,8 +12,7 @@ import {
     logDealActivity,
 } from '@/lib/deals'
 import type { Deal, DealStage, NewDealInput } from '@/lib/deals'
-import { fetchAttachmentsByDeal } from '@/lib/attachments'
-import type { DealAttachment } from '@/lib/attachments'
+import { fetchAttachmentCountsByDeals } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 import NewDealModal from '@/components/pipeline/NewDealModal'
 
@@ -30,6 +29,8 @@ export default function PipelinePage() {
     const [deals, setDeals] = useState<Deal[]>([])
     const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
     const [loading, setLoading] = useState(true)
+    const dealsRef = useRef(deals)
+    dealsRef.current = deals
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
 
@@ -40,22 +41,13 @@ export default function PipelinePage() {
             const data = await fetchDealsByOrg(orgId)
             setDeals(data)
 
-            // Fetch attachment counts for all deals in parallel
-            const counts: AttachmentCounts = {}
-            await Promise.all(
-                data.map(async (deal) => {
-                    try {
-                        const attachments: DealAttachment[] = await fetchAttachmentsByDeal(deal.id)
-                        counts[deal.id] = {
-                            proposal: attachments.filter((a) => a.file_type === 'proposal').length,
-                            total: attachments.length,
-                        }
-                    } catch {
-                        counts[deal.id] = { proposal: 0, total: 0 }
-                    }
-                })
-            )
-            setAttachmentCounts(counts)
+            // Fetch attachment counts in a single query
+            try {
+                const counts = await fetchAttachmentCountsByDeals(data.map(d => d.id))
+                setAttachmentCounts(counts)
+            } catch {
+                setAttachmentCounts({})
+            }
         } finally {
             setLoading(false)
         }
@@ -65,21 +57,24 @@ export default function PipelinePage() {
         loadDeals()
     }, [loadDeals])
 
-    const dealsByStage: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
-        (acc, stage) => ({ ...acc, [stage]: [] }),
-        {} as Record<DealStage, Deal[]>
-    )
-
-    deals.sort((a, b) => {
-        if (a.order_index === b.order_index) {
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        }
-        return (a.order_index ?? 0) - (b.order_index ?? 0)
-    }).forEach((deal) => {
-        if (dealsByStage[deal.stage]) {
-            dealsByStage[deal.stage].push(deal)
-        }
-    })
+    const dealsByStage = useMemo(() => {
+        const grouped: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
+            (acc, stage) => ({ ...acc, [stage]: [] }),
+            {} as Record<DealStage, Deal[]>
+        )
+        const sorted = [...deals].sort((a, b) => {
+            if (a.order_index === b.order_index) {
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            }
+            return (a.order_index ?? 0) - (b.order_index ?? 0)
+        })
+        sorted.forEach((deal) => {
+            if (grouped[deal.stage]) {
+                grouped[deal.stage].push(deal)
+            }
+        })
+        return grouped
+    }, [deals])
 
     async function handleDragEnd(result: DropResult) {
         const { source, destination, draggableId } = result
@@ -88,10 +83,11 @@ export default function PipelinePage() {
 
         const fromStage = source.droppableId as DealStage
         const toStage = destination.droppableId as DealStage
-        const dealToMove = deals.find(d => d.id === draggableId)
+        const snapshotDeals = dealsRef.current
+        const dealToMove = snapshotDeals.find(d => d.id === draggableId)
         if (!dealToMove || !user || !orgId) return
 
-        const updatedDeals = [...deals]
+        const updatedDeals = [...snapshotDeals]
         let newOrderIndex = dealToMove.order_index || 0
         const destDeals = dealsByStage[toStage]
 
@@ -144,7 +140,7 @@ export default function PipelinePage() {
             }
         } catch (err: unknown) {
             console.error('Failed to update stage/position', err)
-            setDeals(deals)
+            setDeals(snapshotDeals)
         }
     }
 
@@ -164,18 +160,18 @@ export default function PipelinePage() {
         }
     }
 
-    function handleDealStageChange(dealId: string, newStage: DealStage) {
+    const handleDealStageChange = useCallback((dealId: string, newStage: DealStage) => {
         setDeals((prev) => prev.map((d) => d.id === dealId ? { ...d, stage: newStage } : d))
-    }
+    }, [])
 
-    function handleDealDeleted(dealId: string) {
+    const handleDealDeleted = useCallback((dealId: string) => {
         setDeals((prev) => prev.filter((d) => d.id !== dealId))
-    }
+    }, [])
 
-    function handleOpenNewDeal(stage: DealStage) {
+    const handleOpenNewDeal = useCallback((stage: DealStage) => {
         setNewDealStage(stage)
         setShowNewDeal(true)
-    }
+    }, [])
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">

@@ -1,29 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
-import { Plus, X } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { supabase } from '@/lib/supabase'
 import { getTasks, createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
-
-interface ClientOption { id: string; name: string }
+import { todayString, toISO } from '@/lib/date-utils'
+import { useMention } from '@/hooks/useMention'
+import type { ClientOption } from '@/hooks/useMention'
+import MentionPopup from '@/components/ui/MentionPopup'
+import ClientChip from '@/components/ui/ClientChip'
 
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TaskList from '@/components/tasks/TaskList'
 
 type ViewType = 'today' | 'upcoming' | 'overdue'
-
-function todayString() {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function toISO(dateStr: string) {
-    if (!dateStr) return null
-    const [y, m, d] = dateStr.split('-').map(Number)
-    return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
-}
 
 export default function TasksPage() {
     const { user } = useAuth()
@@ -33,29 +25,31 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true)
     const [view, setView] = useState<ViewType>('today')
 
-
     // Available clients for @mention
     const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
 
     useEffect(() => {
         if (!orgId) return
+        let cancelled = false
         supabase.from('clients').select('id, name').eq('org_id', orgId).order('name')
-            .then(({ data }) => setAvailableClients(data ?? []))
+            .then(({ data }) => { if (!cancelled) setAvailableClients(data ?? []) })
+        return () => { cancelled = true }
     }, [orgId])
 
     // Inline add state
     const [addingNew, setAddingNew] = useState(false)
     const [newTitle, setNewTitle] = useState('')
     const [newDue, setNewDue] = useState(todayString())
-    const [newClientId, setNewClientId] = useState<string>('')
-    const [newMentionQuery, setNewMentionQuery] = useState<string | null>(null)
     const [addSaving, setAddSaving] = useState(false)
     const newTitleRef = useRef<HTMLInputElement>(null)
+
+    // @mention hook
+    const mention = useMention(availableClients)
 
     // Inline edit state
     const [editingTaskId, setEditingTaskId] = useState<string | undefined>(undefined)
 
-    const loadTasks = async (silent = false) => {
+    const loadTasks = useCallback(async (silent = false) => {
         if (!orgId) return
         if (!silent) setLoading(true)
         try {
@@ -66,55 +60,54 @@ export default function TasksPage() {
         } finally {
             if (!silent) setLoading(false)
         }
-    }
+    }, [orgId, view])
 
     useEffect(() => {
         if (!orgId) return
-        loadTasks()
+        let cancelled = false
+
+        async function load() {
+            setLoading(true)
+            try {
+                const data = await getTasks({ orgId: orgId!, view })
+                if (!cancelled) setTasks(data)
+            } catch (error) {
+                console.error('Failed to load tasks', error)
+            } finally {
+                if (!cancelled) setLoading(false)
+            }
+        }
+
+        load()
+        return () => { cancelled = true }
     }, [orgId, view])
 
-    const openInlineAdd = () => {
+    const openInlineAdd = useCallback(() => {
         setNewTitle('')
         setNewDue(todayString())
-        setNewClientId('')
-        setNewMentionQuery(null)
+        mention.reset()
         setAddingNew(true)
         setTimeout(() => newTitleRef.current?.focus(), 0)
-    }
+    }, [mention])
 
-    const cancelInlineAdd = () => {
+    const cancelInlineAdd = useCallback(() => {
         setAddingNew(false)
         setNewTitle('')
-        setNewClientId('')
-        setNewMentionQuery(null)
-    }
+        mention.reset()
+    }, [mention])
 
-    const handleNewTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleNewTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value
         setNewTitle(val)
-        const lastAt = val.lastIndexOf('@')
-        if (lastAt !== -1) {
-            const afterAt = val.slice(lastAt + 1)
-            if (!afterAt.includes(' ')) { setNewMentionQuery(afterAt); return }
-        }
-        setNewMentionQuery(null)
-    }
+        mention.detectMention(val)
+    }, [mention])
 
-    const selectNewMention = (c: ClientOption) => {
-        const lastAt = newTitle.lastIndexOf('@')
-        setNewTitle(newTitle.slice(0, lastAt).trimEnd())
-        setNewClientId(c.id)
-        setNewMentionQuery(null)
+    const handleSelectNewMention = useCallback((c: ClientOption) => {
+        setNewTitle(prev => mention.selectMention(c, prev))
         setTimeout(() => newTitleRef.current?.focus(), 0)
-    }
+    }, [mention])
 
-    const newMentionClients = newMentionQuery !== null
-        ? availableClients.filter(c => c.name.toLowerCase().includes(newMentionQuery.toLowerCase())).slice(0, 6)
-        : []
-
-    const newClientName = availableClients.find(c => c.id === newClientId)?.name ?? null
-
-    const handleInlineAdd = async () => {
+    const handleInlineAdd = useCallback(async () => {
         if (!user || !orgId || !newTitle.trim() || addSaving) return
         setAddSaving(true)
         try {
@@ -128,36 +121,35 @@ export default function TasksPage() {
                 due_at: toISO(newDue),
             }
             const task = await createTask(input, [])
-            if (newClientId) {
-                await setTaskClientLink(task.id, orgId, newClientId, user.id)
+            if (mention.selectedClientId) {
+                await setTaskClientLink(task.id, orgId, mention.selectedClientId, user.id)
             }
             setAddingNew(false)
             setNewTitle('')
-            setNewClientId('')
+            mention.reset()
             await loadTasks()
         } catch (err) {
             console.error('Failed to create task', err)
         } finally {
             setAddSaving(false)
         }
-    }
+    }, [user, orgId, newTitle, newDue, addSaving, mention, loadTasks])
 
-    const handleToggleComplete = async (task: Task) => {
+    const handleToggleComplete = useCallback(async (task: Task) => {
         const newStatus = task.status === 'completed' ? 'todo' : 'completed'
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
         try {
             await updateTask(task.id, { status: newStatus })
             if (newStatus === 'completed' && view !== 'today') {
-                setTimeout(() => loadTasks(), 500)
+                setTimeout(() => loadTasks(true), 500)
             }
         } catch (error) {
             console.error('Failed to update task', error)
             setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
         }
-    }
+    }, [view, loadTasks])
 
-    const handleInlineEdit = async (task: Task, title: string, dueAt: string, clientId?: string | null) => {
-        // Optimistic update — reflect title/due immediately
+    const handleInlineEdit = useCallback(async (task: Task, title: string, dueAt: string, clientId?: string | null) => {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
         setEditingTaskId(undefined)
         try {
@@ -165,12 +157,16 @@ export default function TasksPage() {
             if (orgId && user && clientId !== undefined) {
                 await setTaskClientLink(task.id, orgId, clientId, user.id)
             }
-            // Silent refresh so client avatar/name reflects the new link without a loading flash
             await loadTasks(true)
         } catch {
             setTasks(prev => prev.map(t => t.id === task.id ? task : t))
         }
-    }
+    }, [orgId, user, loadTasks])
+
+    const handleTaskClick = useCallback((task: Task) => {
+        setAddingNew(false)
+        setEditingTaskId(task.id)
+    }, [])
 
     return (
         <div className="min-h-screen bg-transparent pt-6">
@@ -206,7 +202,7 @@ export default function TasksPage() {
                         </div>
                     ) : (
                         <>
-                            {/* Inline add row — inserted at top of list visually */}
+                            {/* Inline add row */}
                             {addingNew && (
                                 <div className="bg-card rounded-xl border border-border/60 shadow-sm overflow-hidden">
                                     <div className="flex items-center gap-3 px-4 py-3">
@@ -219,10 +215,10 @@ export default function TasksPage() {
                                             onChange={handleNewTitleChange}
                                             onKeyDown={e => {
                                                 if (e.key === 'Escape') {
-                                                    if (newMentionQuery !== null) { setNewMentionQuery(null); return }
+                                                    if (mention.mentionQuery !== null) { mention.closeMention(); return }
                                                     cancelInlineAdd()
                                                 }
-                                                if (e.key === 'Enter' && newMentionQuery === null) handleInlineAdd()
+                                                if (e.key === 'Enter' && mention.mentionQuery === null) handleInlineAdd()
                                             }}
                                             disabled={addSaving}
                                         />
@@ -249,44 +245,20 @@ export default function TasksPage() {
                                     </div>
 
                                     {/* @mention popup */}
-                                    {newMentionQuery !== null && newMentionClients.length > 0 && newTitleRef.current && (
-                                        <div
-                                            style={{
-                                                position: 'fixed',
-                                                top: newTitleRef.current.getBoundingClientRect().bottom + 4,
-                                                left: newTitleRef.current.getBoundingClientRect().left,
-                                                zIndex: 50,
-                                            }}
-                                            className="bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
-                                        >
-                                            {newMentionClients.map(c => (
-                                                <button
-                                                    key={c.id}
-                                                    onMouseDown={(e) => { e.preventDefault(); selectNewMention(c) }}
-                                                    className="w-full text-left px-4 py-1.5 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                                                >
-                                                    <span className="text-muted-foreground/40 mr-0.5">@</span>
-                                                    {c.name}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    {mention.mentionQuery !== null && mention.mentionClients.length > 0 && (
+                                        <MentionPopup
+                                            clients={mention.mentionClients}
+                                            anchorRef={newTitleRef}
+                                            onSelect={handleSelectNewMention}
+                                        />
                                     )}
 
                                     {/* Selected client chip */}
-                                    {newClientId && newClientName && (
-                                        <div className="flex items-center gap-2 px-4 pb-2.5 pl-11">
-                                            <span className="flex items-center gap-1 text-[11px] text-foreground/80 bg-muted rounded-full px-2.5 py-0.5">
-                                                <span className="text-foreground/40">@</span>
-                                                {newClientName}
-                                                <button
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={() => setNewClientId('')}
-                                                    className="ml-0.5 text-foreground/30 hover:text-foreground/60 transition-colors"
-                                                >
-                                                    <X size={9} />
-                                                </button>
-                                            </span>
-                                        </div>
+                                    {mention.selectedClientId && mention.selectedClientName && (
+                                        <ClientChip
+                                            name={mention.selectedClientName}
+                                            onRemove={() => mention.setSelectedClientId('')}
+                                        />
                                     )}
                                 </div>
                             )}
@@ -295,7 +267,7 @@ export default function TasksPage() {
                                 tasks={tasks}
                                 orgId={orgId ?? undefined}
                                 onToggleComplete={handleToggleComplete}
-                                onTaskClick={(task) => { setAddingNew(false); setEditingTaskId(task.id) }}
+                                onTaskClick={handleTaskClick}
                                 editingTaskId={editingTaskId}
                                 onSaveEdit={handleInlineEdit}
                                 onCancelEdit={() => setEditingTaskId(undefined)}

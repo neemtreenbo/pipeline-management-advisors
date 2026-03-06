@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { Plus, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -31,6 +31,39 @@ function formatValue(value: number) {
     if (!value) return null
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
 }
+
+const DealItem = memo(function DealItem({ deal, onSelect }: { deal: Deal; onSelect: (id: string) => void }) {
+    const dealTitle = (deal.data as Record<string, string>)?.title || '—'
+    const formattedValue = formatValue(deal.value)
+    return (
+        <button
+            type="button"
+            onClick={() => onSelect(deal.id)}
+            className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3 hover:border-border hover:shadow-sm transition-all"
+        >
+            <div className="flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground/40 shrink-0">
+                        {getDealIcon(dealTitle, 13)}
+                    </span>
+                    <p className="text-[13px] font-medium text-foreground truncate">{dealTitle}</p>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    <span className="text-[11px] text-muted-foreground/60">{deal.stage}</span>
+                    {formattedValue && (
+                        <span className="text-[11px] font-medium text-foreground/60">{formattedValue}</span>
+                    )}
+                    {deal.expected_close_date && (
+                        <span className="text-[11px] text-muted-foreground/50">
+                            Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                    )}
+                </div>
+            </div>
+            <ChevronRight size={14} className="text-muted-foreground/40 shrink-0" />
+        </button>
+    )
+})
 
 export default function InlineDealsList({ clientId, orgId }: InlineDealsListProps) {
     const { user } = useAuth()
@@ -81,7 +114,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
                 title: title.trim(),
             })
             await logDealActivity(orgId, user.id, deal.id, 'deal_created', { stage, title: title.trim() })
-            await loadDeals()
+            setDeals(prev => [deal, ...prev])
             setAdding(false)
             setTitle('')
         } catch (err) {
@@ -90,6 +123,8 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
             setSaving(false)
         }
     }
+
+    const handleSelectDeal = useCallback((id: string) => setSelectedDealId(id), [])
 
     if (loading) {
         return <div className="py-8 text-center text-sm text-muted-foreground/40 animate-pulse">Loading…</div>
@@ -177,39 +212,9 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
                     <div className="py-8 text-center text-[13px] text-muted-foreground/40">No deals yet</div>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        {deals.map((deal) => {
-                            const dealTitle = (deal.data as Record<string, string>)?.title || '—'
-                            const formattedValue = formatValue(deal.value)
-                            return (
-                                <button
-                                    key={deal.id}
-                                    type="button"
-                                    onClick={() => setSelectedDealId(deal.id)}
-                                    className="w-full text-left flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3 hover:border-border hover:shadow-sm transition-all"
-                                >
-                                    <div className="flex flex-col gap-0.5 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-muted-foreground/40 shrink-0">
-                                                {getDealIcon(dealTitle, 13)}
-                                            </span>
-                                            <p className="text-[13px] font-medium text-foreground truncate">{dealTitle}</p>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                            <span className="text-[11px] text-muted-foreground/60">{deal.stage}</span>
-                                            {formattedValue && (
-                                                <span className="text-[11px] font-medium text-foreground/60">{formattedValue}</span>
-                                            )}
-                                            {deal.expected_close_date && (
-                                                <span className="text-[11px] text-muted-foreground/50">
-                                                    Close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <ChevronRight size={14} className="text-muted-foreground/40 shrink-0" />
-                                </button>
-                            )
-                        })}
+                        {deals.map((deal) => (
+                            <DealItem key={deal.id} deal={deal} onSelect={handleSelectDeal} />
+                        ))}
                     </div>
                 )}
             </div>

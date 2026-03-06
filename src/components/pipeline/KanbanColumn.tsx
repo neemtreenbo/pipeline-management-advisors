@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Plus } from 'lucide-react'
 import { Droppable } from '@hello-pangea/dnd'
 import type { Deal, DealStage } from '@/lib/deals'
@@ -17,7 +18,7 @@ interface KanbanColumnProps {
     onDealDeleted?: (dealId: string) => void
 }
 
-export default function KanbanColumn({
+export default memo(function KanbanColumn({
     stage,
     deals,
     attachmentCounts,
@@ -88,4 +89,4 @@ export default function KanbanColumn({
             </Droppable>
         </div>
     )
-}
+})

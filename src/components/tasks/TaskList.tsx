@@ -1,13 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { Task } from '@/lib/tasks'
 import { getClientsForTasks } from '@/lib/tasks'
 import { supabase } from '@/lib/supabase'
+import type { ClientOption } from '@/hooks/useMention'
 import TaskItem from './TaskItem'
-
-interface ClientOption {
-    id: string
-    name: string
-}
 
 interface TaskListProps {
     tasks: Task[]
@@ -35,11 +31,17 @@ export default function TaskList({
     const [clientsMap, setClientsMap] = useState<Record<string, { id: string; name: string; profilePictureUrl: string | null }>>({})
     const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
 
+    // Memoize task IDs to avoid unnecessary refetches
+    const taskIdKey = useMemo(() => tasks.map(t => t.id).join(','), [tasks])
+
     useEffect(() => {
+        if (!tasks || tasks.length === 0) { setClientsMap({}); return }
+        let cancelled = false
+
         async function loadClients() {
-            if (!tasks || tasks.length === 0) { setClientsMap({}); return }
             try {
                 const infos = await getClientsForTasks(tasks.map(t => t.id))
+                if (cancelled) return
                 const cMap: Record<string, { id: string; name: string; profilePictureUrl: string | null }> = {}
                 infos.forEach(i => { cMap[i.taskId] = { id: i.clientId, name: i.clientName, profilePictureUrl: i.profilePictureUrl } })
                 setClientsMap(cMap)
@@ -47,17 +49,21 @@ export default function TaskList({
                 console.error('Failed to load clients', err)
             }
         }
+
         loadClients()
-    }, [tasks])
+        return () => { cancelled = true }
+    }, [taskIdKey])
 
     useEffect(() => {
         if (!orgId) return
+        let cancelled = false
         supabase
             .from('clients')
             .select('id, name')
             .eq('org_id', orgId)
             .order('name')
-            .then(({ data }) => setAvailableClients(data ?? []))
+            .then(({ data }) => { if (!cancelled) setAvailableClients(data ?? []) })
+        return () => { cancelled = true }
     }, [orgId])
 
     if (!tasks || tasks.length === 0) {

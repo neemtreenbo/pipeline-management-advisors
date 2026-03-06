@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { Paperclip } from 'lucide-react'
 import { Draggable } from '@hello-pangea/dnd'
 import type { Deal, DealStage } from '@/lib/deals'
@@ -24,7 +24,7 @@ function formatCurrency(value: number) {
     return `₱${value.toLocaleString()}`
 }
 
-export default function DealCard({
+export default memo(function DealCard({
     deal,
     index,
     proposalCount,
@@ -137,4 +137,4 @@ export default function DealCard({
             )}
         </>
     )
-}
+})

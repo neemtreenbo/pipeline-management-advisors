@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -54,12 +54,14 @@ export default function ClientSelector({
         }
     }, [value, defaultSearch, clientDropdownOpen, clientSearch])
 
-    const filteredClients = clients.filter((c) =>
-        c.name.toLowerCase().includes(clientSearch.toLowerCase())
+    const filteredClients = useMemo(
+        () => clients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase())),
+        [clients, clientSearch]
     )
 
-    const exactMatchExists = clients.some(
-        (c) => c.name.toLowerCase() === clientSearch.toLowerCase().trim()
+    const exactMatchExists = useMemo(
+        () => clients.some((c) => c.name.toLowerCase() === clientSearch.toLowerCase().trim()),
+        [clients, clientSearch]
     )
 
     async function handleCreateClient() {

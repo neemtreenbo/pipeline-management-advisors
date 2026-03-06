@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
+import { useDebouncedSave } from '@/hooks/useDebouncedSave'
 import { fetchDealsByClient } from '@/lib/deals'
 import type { Deal } from '@/lib/deals'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
@@ -115,6 +116,28 @@ export default function ClientDetailPage() {
     const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
+
+    // Debounced URL saves — prevents DB write on every keystroke
+    const saveLinkedIn = useCallback(async (val: string) => {
+        if (!clientId) return
+        await supabase.from('clients').update({ linkedin_url: val || null }).eq('id', clientId)
+    }, [clientId])
+    const debouncedSaveLinkedIn = useDebouncedSave(saveLinkedIn)
+
+    const saveInstagram = useCallback(async (val: string) => {
+        if (!clientId) return
+        await supabase.from('clients').update({ instagram_url: val || null }).eq('id', clientId)
+    }, [clientId])
+    const debouncedSaveInstagram = useDebouncedSave(saveInstagram)
+
+    const handleActivityAdded = useCallback((a: typeof activities[number]) => {
+        setActivities(prev => [a, ...prev])
+    }, [])
+
+    const contextDeals = useMemo(
+        () => deals.map(d => ({ id: d.id, name: (d.data as Record<string, string>)?.title || client?.name || 'Deal' })),
+        [deals, client?.name]
+    )
 
     useEffect(() => {
         fetchClient()
@@ -597,10 +620,10 @@ export default function ClientDetailPage() {
                                                 placeholder="https://linkedin.com/in/..."
                                                 className="bg-background"
                                                 value={client.linkedin_url || ''}
-                                                onChange={async (e) => {
+                                                onChange={(e) => {
                                                     const val = e.target.value;
                                                     setClient(c => c ? { ...c, linkedin_url: val } : c);
-                                                    await supabase.from('clients').update({ linkedin_url: val || null }).eq('id', client.id);
+                                                    debouncedSaveLinkedIn(val);
                                                 }}
                                             />
                                             <Button
@@ -635,10 +658,10 @@ export default function ClientDetailPage() {
                                                 placeholder="https://instagram.com/..."
                                                 className="bg-background"
                                                 value={client.instagram_url || ''}
-                                                onChange={async (e) => {
+                                                onChange={(e) => {
                                                     const val = e.target.value;
                                                     setClient(c => c ? { ...c, instagram_url: val } : c);
-                                                    await supabase.from('clients').update({ instagram_url: val || null }).eq('id', client.id);
+                                                    debouncedSaveInstagram(val);
                                                 }}
                                             />
                                         </div>
@@ -763,19 +786,19 @@ export default function ClientDetailPage() {
 
                     {/* Tasks */}
                     < TabsContent value="tasks" >
-                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} inlineAdd onActivityAdded={(a) => setActivities(prev => [a, ...prev])} />}
+                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} inlineAdd onActivityAdded={handleActivityAdded} />}
                     </TabsContent >
 
                     {/* Notes */}
                     < TabsContent value="notes" >
-                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd onActivityAdded={(a) => setActivities(prev => [a, ...prev])} />}
+                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd onActivityAdded={handleActivityAdded} />}
                     </TabsContent >
 
                     {/* Activity */}
                     < TabsContent value="activity" >
                         <ActivityTimeline
                             activities={activities}
-                            contextDeals={deals.map(d => ({ id: d.id, name: (d.data as Record<string, string>)?.title || client?.name || 'Deal' }))}
+                            contextDeals={contextDeals}
                         />
                     </TabsContent >
                 </div >

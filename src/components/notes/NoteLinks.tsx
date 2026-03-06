@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Link as LinkIcon, User, Briefcase, FileText, CheckSquare, File, Plus, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -14,6 +14,14 @@ const TYPE_META: Record<string, { icon: React.ElementType; label: string; color:
     task:   { icon: CheckSquare, label: 'Task',     color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' },
     note:   { icon: FileText,    label: 'Note',     color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30' },
     proposal: { icon: File,      label: 'Proposal', color: 'text-rose-500 bg-rose-50 dark:bg-rose-900/30' },
+}
+
+const TABLE_MAP: Record<string, string> = {
+    client: 'clients',
+    deal: 'deals',
+    task: 'tasks',
+    note: 'notes',
+    proposal: 'proposals',
 }
 
 interface NoteLinksProps {
@@ -37,7 +45,7 @@ export default function NoteLinks({ noteId, orgId, onLinksChanged }: NoteLinksPr
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false)
 
-    async function fetchLinks() {
+    const fetchLinks = useCallback(async () => {
         setLoading(true)
         try {
             const rawLinks = await getEntitiesLinkedToNote(noteId)
@@ -49,60 +57,72 @@ export default function NoteLinks({ noteId, orgId, onLinksChanged }: NoteLinksPr
 
             const entities: LinkedEntity[] = []
 
-            for (const [type, typeLinks] of Object.entries(byType)) {
-                const ids = typeLinks.map(l => l.to_id)
-                let tableName = ''
-                if (type === 'client') tableName = 'clients'
-                else if (type === 'deal') tableName = 'deals'
-                else if (type === 'task') tableName = 'tasks'
-                else if (type === 'note') tableName = 'notes'
-                else if (type === 'proposal') tableName = 'proposals'
-                if (!tableName) continue
+            // Parallelize fetches for each entity type
+            const fetchPromises = Object.entries(byType).map(async ([type, typeLinks]) => {
+                const tableName = TABLE_MAP[type]
+                if (!tableName) return []
 
+                const ids = typeLinks.map(l => l.to_id)
                 const { data } = await supabase.from(tableName).select('*').in('id', ids)
-                if (data) {
-                    typeLinks.forEach(link => {
-                        const entity = data.find(e => e.id === link.to_id)
-                        let name = 'Unknown'
-                        let avatarUrl: string | null = null
-                        if (entity) {
-                            if (type === 'client') { name = entity.name; avatarUrl = entity.profile_picture_url ?? null }
-                            else if (type === 'deal') name = (entity.data as any)?.title || 'Deal'
-                            else name = entity.title || 'Untitled'
-                        }
-                        entities.push({ linkId: link.id, type: link.to_type, id: link.to_id, name, avatarUrl })
-                    })
-                }
-            }
+
+                if (!data) return []
+
+                const entityMap = new Map(data.map(e => [e.id, e]))
+
+                return typeLinks.map(link => {
+                    const entity = entityMap.get(link.to_id)
+                    let name = 'Unknown'
+                    let avatarUrl: string | null = null
+                    if (entity) {
+                        if (type === 'client') { name = entity.name; avatarUrl = entity.profile_picture_url ?? null }
+                        else if (type === 'deal') name = (entity.data as any)?.title || 'Deal'
+                        else name = entity.title || 'Untitled'
+                    }
+                    return { linkId: link.id, type: link.to_type, id: link.to_id, name, avatarUrl } as LinkedEntity
+                })
+            })
+
+            const results = await Promise.all(fetchPromises)
+            entities.push(...results.flat())
             setLinks(entities)
         } catch (err) {
             console.error(err)
         } finally {
             setLoading(false)
         }
-    }
+    }, [noteId])
 
-    useEffect(() => { fetchLinks() }, [noteId])
+    useEffect(() => {
+        fetchLinks()
+    }, [fetchLinks])
 
-    async function handleUnlink(type: string, id: string) {
+    const handleUnlink = useCallback(async (type: string, id: string) => {
         if (!confirm('Remove this link?')) return
-        await unlinkNoteFromEntity(noteId, type, id)
-        await fetchLinks()
-        if (onLinksChanged) onLinksChanged()
-    }
+        try {
+            await unlinkNoteFromEntity(noteId, type, id)
+            await fetchLinks()
+            onLinksChanged?.()
+        } catch (err) {
+            console.error('Failed to unlink', err)
+        }
+    }, [noteId, fetchLinks, onLinksChanged])
 
-    async function handleLinkSelected(type: string, id: string) {
+    const handleLinkSelected = useCallback(async (type: string, id: string) => {
         if (!user) return
-        await linkNoteToEntity(noteId, type, id, orgId, user.id)
-        await fetchLinks()
-        if (onLinksChanged) onLinksChanged()
-    }
+        try {
+            await linkNoteToEntity(noteId, type, id, orgId, user.id)
+            await fetchLinks()
+            onLinksChanged?.()
+        } catch (err) {
+            console.error('Failed to link', err)
+        }
+    }, [noteId, orgId, user, fetchLinks, onLinksChanged])
 
-    async function handleLinkClient(clientId: string) {
+    const handleLinkClient = useCallback(async (clientId: string) => {
         if (!clientId) return
         await handleLinkSelected('client', clientId)
         setIsClientSelectorOpen(false)
-    }
+    }, [handleLinkSelected])
 
     return (
         <div className="flex flex-col gap-3">

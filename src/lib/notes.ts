@@ -92,6 +92,42 @@ export async function getNotesByOrg(orgId: string): Promise<Note[]> {
     return data as Note[]
 }
 
+export interface PaginatedNotesResult {
+    notes: Note[]
+    hasMore: boolean
+    nextCursor: string | null
+}
+
+export async function getNotesByOrgPaginated(
+    orgId: string,
+    pageSize = 24,
+    cursor?: string | null
+): Promise<PaginatedNotesResult> {
+    let query = supabase
+        .from('notes')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('updated_at', { ascending: false })
+        .limit(pageSize + 1)
+
+    if (cursor) {
+        query = query.lt('updated_at', cursor)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    const notes = (data ?? []) as Note[]
+    const hasMore = notes.length > pageSize
+    if (hasMore) notes.pop()
+
+    return {
+        notes,
+        hasMore,
+        nextCursor: notes.length > 0 ? notes[notes.length - 1].updated_at : null,
+    }
+}
+
 // Links
 export async function linkNoteToEntity(
     noteId: string,
@@ -227,63 +263,36 @@ export interface SearchResult {
 }
 
 export async function searchEntitiesForLinking(orgId: string, query: string, excludeNoteId: string): Promise<SearchResult[]> {
+    const q = query.trim()
+    if (!q) return []
+
+    // Run all searches in parallel
+    const [clientsRes, dealsRes, proposalsRes, notesRes] = await Promise.all([
+        supabase.from('clients').select('id, name, email').eq('org_id', orgId).ilike('name', `%${q}%`).limit(5),
+        supabase.from('deals').select('id, data, stage').eq('org_id', orgId).limit(20),
+        supabase.from('proposals').select('id, title, status').eq('org_id', orgId).ilike('title', `%${q}%`).limit(5),
+        supabase.from('notes').select('id, title').eq('org_id', orgId).neq('id', excludeNoteId).ilike('title', `%${q}%`).limit(5),
+    ])
+
     const results: SearchResult[] = []
 
-    // Clean query
-    const q = query.trim()
-    if (!q) return results
-
-    // 1. Search Clients
-    const { data: clients, error: errClients } = await supabase
-        .from('clients')
-        .select('id, name, email')
-        .eq('org_id', orgId)
-        .ilike('name', `%${q}%`)
-        .limit(5)
-
-    if (!errClients && clients) {
-        clients.forEach(c => results.push({ id: c.id, type: 'client', title: c.name, subtitle: c.email || undefined }))
+    if (!clientsRes.error && clientsRes.data) {
+        clientsRes.data.forEach(c => results.push({ id: c.id, type: 'client', title: c.name, subtitle: c.email || undefined }))
     }
 
-    // 2. Search Deals
-    const { data: deals, error: errDeals } = await supabase
-        .from('deals')
-        .select('id, data, stage')
-        .eq('org_id', orgId)
-        .limit(20) // Cannot properly ilike jsonb directly without specific postgres functions in standard rest, so let's filter in memory
-
-    if (!errDeals && deals) {
-        const matchedDeals = deals.filter(d => {
-            const title = d.data?.title || 'Unknown'
-            return title.toLowerCase().includes(q.toLowerCase())
-        }).slice(0, 5)
-
-        matchedDeals.forEach(d => results.push({ id: d.id, type: 'deal', title: d.data?.title || 'Unknown', subtitle: `Stage: ${d.stage}` }))
+    if (!dealsRes.error && dealsRes.data) {
+        dealsRes.data
+            .filter(d => (d.data?.title || 'Unknown').toLowerCase().includes(q.toLowerCase()))
+            .slice(0, 5)
+            .forEach(d => results.push({ id: d.id, type: 'deal', title: d.data?.title || 'Unknown', subtitle: `Stage: ${d.stage}` }))
     }
 
-    // 3. Search Proposals
-    const { data: proposals, error: errProposals } = await supabase
-        .from('proposals')
-        .select('id, title, status')
-        .eq('org_id', orgId)
-        .ilike('title', `%${q}%`)
-        .limit(5)
-
-    if (!errProposals && proposals) {
-        proposals.forEach(p => results.push({ id: p.id, type: 'proposal', title: p.title, subtitle: p.status }))
+    if (!proposalsRes.error && proposalsRes.data) {
+        proposalsRes.data.forEach(p => results.push({ id: p.id, type: 'proposal', title: p.title, subtitle: p.status }))
     }
 
-    // 4. Search Notes
-    const { data: notes, error: errNotes } = await supabase
-        .from('notes')
-        .select('id, title')
-        .eq('org_id', orgId)
-        .neq('id', excludeNoteId)
-        .ilike('title', `%${q}%`)
-        .limit(5)
-
-    if (!errNotes && notes) {
-        notes.forEach(n => results.push({ id: n.id, type: 'note', title: n.title || 'Untitled Note', subtitle: 'Note' }))
+    if (!notesRes.error && notesRes.data) {
+        notesRes.data.forEach(n => results.push({ id: n.id, type: 'note', title: n.title || 'Untitled Note', subtitle: 'Note' }))
     }
 
     return results

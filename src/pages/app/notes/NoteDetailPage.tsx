@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, Calendar } from 'lucide-react'
-import type { PartialBlock } from '@blocknote/core'
-import { getNoteById, updateNote, deleteNote, logNoteActivityThrottled } from '@/lib/notes'
+import { getNoteById, deleteNote } from '@/lib/notes'
 import type { Note } from '@/lib/notes'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNoteAutoSave } from '@/hooks/useNoteAutoSave'
 import BlockNoteEditor from '@/components/notes/BlockNoteEditor'
 import NoteLinks from '@/components/notes/NoteLinks'
 import { Button } from '@/components/ui/button'
@@ -16,73 +16,50 @@ export default function NoteDetailPage() {
     const [note, setNote] = useState<Note | null>(null)
     const [loading, setLoading] = useState(true)
     const [title, setTitle] = useState('')
-    const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | ''>('')
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const mountedRef = useRef(true)
 
-    // Use refs for debounced saving to avoid stale closures
-    const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const latestContent = useRef<PartialBlock[] | null>(null)
-    const latestTitle = useRef<string>('')
+    const { saveStatus, updateContent, updateTitle, initRefs } = useNoteAutoSave(noteId, note?.org_id, user?.id)
+
+    useEffect(() => {
+        mountedRef.current = true
+        return () => { mountedRef.current = false }
+    }, [])
 
     useEffect(() => {
         if (!noteId) return
-        loadNote()
-        return () => {
-            if (saveTimeout.current) clearTimeout(saveTimeout.current)
-        }
-    }, [noteId])
+        let cancelled = false
 
-    async function loadNote() {
-        setLoading(true)
-        try {
-            const data = await getNoteById(noteId!)
-            if (data) {
-                setNote(data)
-                setTitle(data.title || '')
-                latestTitle.current = data.title || ''
-                latestContent.current = data.content
-            }
-        } catch (err) {
-            console.error(err)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const triggerSave = () => {
-        if (!noteId) return
-        setSaveStatus('saving')
-        if (saveTimeout.current) clearTimeout(saveTimeout.current)
-
-        saveTimeout.current = setTimeout(async () => {
+        async function loadNote() {
+            setLoading(true)
             try {
-                await updateNote(noteId, {
-                    title: latestTitle.current,
-                    content: latestContent.current
-                })
-                if (note?.org_id && user?.id) {
-                    logNoteActivityThrottled(note.org_id, user.id, noteId, latestTitle.current || 'Untitled Note', 'note_edited').catch(console.error)
+                const data = await getNoteById(noteId!)
+                if (cancelled) return
+                if (data) {
+                    setNote(data)
+                    setTitle(data.title || '')
+                    initRefs(data.title || '', data.content)
                 }
-                setSaveStatus('saved')
-                setTimeout(() => setSaveStatus(''), 2000)
             } catch (err) {
-                console.error('Failed to save note', err)
-                setSaveStatus('error')
+                console.error(err)
+            } finally {
+                if (!cancelled) setLoading(false)
             }
-        }, 1000)
-    }
+        }
 
-    const handleContentChange = (content: PartialBlock[]) => {
-        latestContent.current = content
-        triggerSave()
+        loadNote()
+        return () => { cancelled = true }
+    }, [noteId, initRefs])
+
+    const handleContentChange = (content: any) => {
+        updateContent(content)
     }
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value
         setTitle(val)
-        latestTitle.current = val
-        triggerSave()
+        updateTitle(val)
     }
 
     const handleDelete = async () => {
@@ -93,8 +70,10 @@ export default function NoteDetailPage() {
             navigate('/app/notes')
         } catch (err) {
             console.error('Failed to delete note', err)
-            setDeleting(false)
-            setConfirmDelete(false)
+            if (mountedRef.current) {
+                setDeleting(false)
+                setConfirmDelete(false)
+            }
         }
     }
 

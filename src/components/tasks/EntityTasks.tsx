@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { getTasks, createTask, updateTask } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
+import { todayString, toISO } from '@/lib/date-utils'
 import { useAuth } from '@/contexts/AuthContext'
 import TaskList from './TaskList'
 import TaskDialog from './TaskDialog'
@@ -24,17 +25,6 @@ interface EntityTasksProps {
     onActivityAdded?: (activity: OptimisticActivity) => void
 }
 
-function todayString() {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function toISO(dateStr: string) {
-    if (!dateStr) return null
-    const [y, m, d] = dateStr.split('-').map(Number)
-    return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
-}
-
 export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActivityAdded }: EntityTasksProps) {
     const { user } = useAuth()
     const [tasks, setTasks] = useState<Task[]>([])
@@ -54,29 +44,49 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
     const [taskToEdit, setTaskToEdit] = useState<Task | undefined>()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-    useEffect(() => {
-        if (!orgId) return
-        loadTasks()
-    }, [orgId, clientId, dealId])
+    const sortTasks = useCallback((data: Task[]) => {
+        return [...data].sort((a, b) => {
+            if (a.status === 'completed' && b.status !== 'completed') return 1
+            if (a.status !== 'completed' && b.status === 'completed') return -1
+            if (a.due_at && b.due_at) return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+            return 0
+        })
+    }, [])
 
-    async function loadTasks() {
+    const loadTasks = useCallback(async () => {
         setLoading(true)
         try {
             const data = await getTasks({ orgId, clientId, dealId, view: 'all' })
-            setTasks(data.sort((a, b) => {
-                if (a.status === 'completed' && b.status !== 'completed') return 1
-                if (a.status !== 'completed' && b.status === 'completed') return -1
-                if (a.due_at && b.due_at) return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
-                return 0
-            }))
+            setTasks(sortTasks(data))
         } catch (err) {
             console.error('Failed to load entity tasks', err)
         } finally {
             setLoading(false)
         }
-    }
+    }, [orgId, clientId, dealId, sortTasks])
 
-    async function handleToggleComplete(task: Task) {
+    useEffect(() => {
+        if (!orgId) return
+        let cancelled = false
+
+        async function load() {
+            setLoading(true)
+            try {
+                const data = await getTasks({ orgId, clientId, dealId, view: 'all' })
+                if (cancelled) return
+                setTasks(sortTasks(data))
+            } catch (err) {
+                console.error('Failed to load entity tasks', err)
+            } finally {
+                if (!cancelled) setLoading(false)
+            }
+        }
+
+        load()
+        return () => { cancelled = true }
+    }, [orgId, clientId, dealId, sortTasks])
+
+    const handleToggleComplete = useCallback(async (task: Task) => {
         const newStatus = task.status === 'completed' ? 'todo' : 'completed'
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
         try {
@@ -84,22 +94,22 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
         } catch {
             setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
         }
-    }
+    }, [])
 
-    function openInlineAdd() {
+    const openInlineAdd = useCallback(() => {
         setEditingTaskId(undefined)
         setAddTitle('')
         setAddDue(todayString())
         setAdding(true)
         setTimeout(() => addTitleRef.current?.focus(), 0)
-    }
+    }, [])
 
-    function cancelInlineAdd() {
+    const cancelInlineAdd = useCallback(() => {
         setAdding(false)
         setAddTitle('')
-    }
+    }, [])
 
-    async function handleInlineAdd() {
+    const handleInlineAdd = useCallback(async () => {
         if (!user || !addTitle.trim()) return
         setAddSaving(true)
         try {
@@ -116,7 +126,6 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
             if (clientId) links.push({ toId: clientId, toType: 'client' })
             if (dealId) links.push({ toId: dealId, toType: 'deal' })
             const newTask = await createTask(taskInput, links)
-            // Optimistic activity update
             onActivityAdded?.({
                 id: `optimistic-task-${newTask.id}`,
                 event_type: 'task_created',
@@ -134,9 +143,9 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
         } finally {
             setAddSaving(false)
         }
-    }
+    }, [user, orgId, addTitle, addDue, clientId, dealId, onActivityAdded, loadTasks])
 
-    async function handleInlineEdit(task: Task, title: string, dueAt: string) {
+    const handleInlineEdit = useCallback(async (task: Task, title: string, dueAt: string) => {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
         setEditingTaskId(undefined)
         try {
@@ -144,9 +153,9 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
         } catch {
             setTasks(prev => prev.map(t => t.id === task.id ? task : t))
         }
-    }
+    }, [])
 
-    function handleTaskClick(task: Task) {
+    const handleTaskClick = useCallback((task: Task) => {
         if (inlineAdd) {
             setAdding(false)
             setEditingTaskId(task.id)
@@ -154,7 +163,7 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
             setTaskToEdit(task)
             setIsDialogOpen(true)
         }
-    }
+    }, [inlineAdd])
 
     if (loading) {
         return <div className="py-8 text-center text-sm text-muted-foreground/40 animate-pulse">Loading…</div>

@@ -1,11 +1,11 @@
-import { CheckCircle2, Circle, X } from 'lucide-react'
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react'
+import { CheckCircle2, Circle } from 'lucide-react'
 import type { Task } from '@/lib/tasks'
-import { useCallback, useRef, useEffect, useState } from 'react'
-
-interface ClientOption {
-    id: string
-    name: string
-}
+import { toDateInput, formatDueDate } from '@/lib/date-utils'
+import { useMention } from '@/hooks/useMention'
+import type { ClientOption } from '@/hooks/useMention'
+import MentionPopup from '@/components/ui/MentionPopup'
+import ClientChip from '@/components/ui/ClientChip'
 
 interface TaskItemProps {
     task: Task
@@ -20,29 +20,7 @@ interface TaskItemProps {
     onCancelEdit?: () => void
 }
 
-function toDateInput(iso: string | null) {
-    if (!iso) return ''
-    const d = new Date(iso)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function formatDueDate(dateString: string | null): { label: string; overdue: boolean } | null {
-    if (!dateString) return null
-    const date = new Date(dateString)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const isToday =
-        date.getDate() === today.getDate() &&
-        date.getMonth() === today.getMonth() &&
-        date.getFullYear() === today.getFullYear()
-    const overdue = date < today && !isToday
-    const label = isToday
-        ? 'Today'
-        : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date)
-    return { label, overdue }
-}
-
-function ClientAvatar({ name, profilePictureUrl }: { name: string; profilePictureUrl?: string | null }) {
+const ClientAvatar = React.memo(function ClientAvatar({ name, profilePictureUrl }: { name: string; profilePictureUrl?: string | null }) {
     if (profilePictureUrl) {
         return <img src={profilePictureUrl} alt={name} className="w-5 h-5 rounded-full object-cover shrink-0" />
     }
@@ -53,9 +31,9 @@ function ClientAvatar({ name, profilePictureUrl }: { name: string; profilePictur
             </span>
         </div>
     )
-}
+})
 
-export default function TaskItem({
+const TaskItem = React.memo(function TaskItem({
     task,
     client,
     currentClientId,
@@ -70,16 +48,18 @@ export default function TaskItem({
     const isCompleted = task.status === 'completed'
     const [titleDraft, setTitleDraft] = useState(task.title)
     const [dueDraft, setDueDraft] = useState(toDateInput(task.due_at))
-    const [selectedClientId, setSelectedClientId] = useState<string>(currentClientId ?? '')
-    const [mentionQuery, setMentionQuery] = useState<string | null>(null)
     const titleRef = useRef<HTMLInputElement>(null)
+
+    const mention = useMention(availableClients, currentClientId)
+
+    // Resolve name with fallback to client prop
+    const resolvedClientName = mention.selectedClientName ?? (mention.selectedClientId ? client?.name : null) ?? null
 
     useEffect(() => {
         if (isEditing) {
             setTitleDraft(task.title)
             setDueDraft(toDateInput(task.due_at))
-            setSelectedClientId(currentClientId ?? '')
-            setMentionQuery(null)
+            mention.reset(currentClientId)
             setTimeout(() => titleRef.current?.focus(), 0)
         }
     }, [isEditing, task.title, task.due_at, currentClientId])
@@ -91,42 +71,21 @@ export default function TaskItem({
 
     const handleSave = useCallback(() => {
         if (!titleDraft.trim()) return
-        onSaveEdit?.(task, titleDraft.trim(), dueDraft, selectedClientId || null)
-    }, [task, titleDraft, dueDraft, selectedClientId, onSaveEdit])
+        onSaveEdit?.(task, titleDraft.trim(), dueDraft, mention.selectedClientId || null)
+    }, [task, titleDraft, dueDraft, mention.selectedClientId, onSaveEdit])
 
-    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value
         setTitleDraft(val)
+        mention.detectMention(val)
+    }, [mention])
 
-        // Detect @mention — find last @ not followed by a space
-        const lastAt = val.lastIndexOf('@')
-        if (lastAt !== -1) {
-            const afterAt = val.slice(lastAt + 1)
-            if (!afterAt.includes(' ')) {
-                setMentionQuery(afterAt)
-                return
-            }
-        }
-        setMentionQuery(null)
-    }
-
-    const selectMention = (c: ClientOption) => {
-        // Strip the @query from title
-        const lastAt = titleDraft.lastIndexOf('@')
-        setTitleDraft(titleDraft.slice(0, lastAt).trimEnd())
-        setSelectedClientId(c.id)
-        setMentionQuery(null)
+    const handleSelectMention = useCallback((c: ClientOption) => {
+        setTitleDraft(prev => mention.selectMention(c, prev))
         setTimeout(() => titleRef.current?.focus(), 0)
-    }
+    }, [mention])
 
-    const mentionClients = mentionQuery !== null
-        ? availableClients.filter(c => c.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 6)
-        : []
-
-    const selectedClientName = availableClients.find(c => c.id === selectedClientId)?.name
-        ?? (selectedClientId ? client?.name : null)
-
-    const dueInfo = formatDueDate(task.due_at)
+    const dueInfo = useMemo(() => formatDueDate(task.due_at), [task.due_at])
 
     // Inline edit form
     if (isEditing) {
@@ -143,10 +102,10 @@ export default function TaskItem({
                         onChange={handleTitleChange}
                         onKeyDown={(e) => {
                             if (e.key === 'Escape') {
-                                if (mentionQuery !== null) { setMentionQuery(null); return }
+                                if (mention.mentionQuery !== null) { mention.closeMention(); return }
                                 onCancelEdit?.()
                             }
-                            if (e.key === 'Enter' && mentionQuery === null) handleSave()
+                            if (e.key === 'Enter' && mention.mentionQuery === null) handleSave()
                         }}
                     />
                     <input
@@ -170,45 +129,21 @@ export default function TaskItem({
                     </button>
                 </div>
 
-                {/* @mention popup — fixed so it escapes overflow-hidden containers */}
-                {mentionQuery !== null && mentionClients.length > 0 && titleRef.current && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: titleRef.current.getBoundingClientRect().bottom + 4,
-                            left: titleRef.current.getBoundingClientRect().left,
-                            zIndex: 50,
-                        }}
-                        className="bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]"
-                    >
-                        {mentionClients.map(c => (
-                            <button
-                                key={c.id}
-                                onMouseDown={(e) => { e.preventDefault(); selectMention(c) }}
-                                className="w-full text-left px-4 py-1.5 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                            >
-                                <span className="text-muted-foreground/40 mr-0.5">@</span>
-                                {c.name}
-                            </button>
-                        ))}
-                    </div>
+                {/* @mention popup */}
+                {mention.mentionQuery !== null && mention.mentionClients.length > 0 && (
+                    <MentionPopup
+                        clients={mention.mentionClients}
+                        anchorRef={titleRef}
+                        onSelect={handleSelectMention}
+                    />
                 )}
 
                 {/* Selected client chip */}
-                {selectedClientId && selectedClientName && (
-                    <div className="flex items-center gap-2 px-4 pb-2.5 pl-11">
-                        <span className="flex items-center gap-1 text-[11px] text-foreground/80 bg-muted rounded-full px-2.5 py-0.5">
-                            <span className="text-foreground/40">@</span>
-                            {selectedClientName}
-                            <button
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => setSelectedClientId('')}
-                                className="ml-0.5 text-foreground/30 hover:text-foreground/60 transition-colors"
-                            >
-                                <X size={9} />
-                            </button>
-                        </span>
-                    </div>
+                {mention.selectedClientId && resolvedClientName && (
+                    <ClientChip
+                        name={resolvedClientName}
+                        onRemove={() => mention.setSelectedClientId('')}
+                    />
                 )}
             </div>
         )
@@ -259,4 +194,6 @@ export default function TaskItem({
             </div>
         </div>
     )
-}
+})
+
+export default TaskItem

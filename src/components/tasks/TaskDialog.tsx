@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { createTask, updateTask } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
+import { toLocalDayString } from '@/lib/date-utils'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,7 @@ export default function TaskDialog({
     defaultDealId
 }: TaskDialogProps) {
     const { user } = useAuth()
+    const mountedRef = useRef(true)
 
     const [form, setForm] = useState({
         title: '',
@@ -43,19 +45,19 @@ export default function TaskDialog({
     const [defaultSearch, setDefaultSearch] = useState<string>('')
 
     useEffect(() => {
+        mountedRef.current = true
+        return () => { mountedRef.current = false }
+    }, [])
+
+    useEffect(() => {
         if (isOpen) {
-            const getLocalDayString = (dateObj: Date) => {
-                const year = dateObj.getFullYear()
-                const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-                const day = String(dateObj.getDate()).padStart(2, '0')
-                return `${year}-${month}-${day}`
-            }
+            let cancelled = false
 
             if (taskToEdit) {
                 setForm({
                     title: taskToEdit.title,
                     description: taskToEdit.description || '',
-                    due_at: taskToEdit.due_at ? getLocalDayString(new Date(taskToEdit.due_at)) : '',
+                    due_at: taskToEdit.due_at ? toLocalDayString(new Date(taskToEdit.due_at)) : '',
                 })
 
                 supabase
@@ -66,10 +68,11 @@ export default function TaskDialog({
                     .eq('to_type', 'client')
                     .maybeSingle()
                     .then(({ data }) => {
+                        if (cancelled) return
                         if (data) {
                             setSelectedClientId(data.to_id)
                             supabase.from('clients').select('name').eq('id', data.to_id).maybeSingle().then(cRes => {
-                                if (cRes.data) setDefaultSearch(cRes.data.name)
+                                if (!cancelled && cRes.data) setDefaultSearch(cRes.data.name)
                             })
                         } else {
                             setSelectedClientId('')
@@ -81,13 +84,13 @@ export default function TaskDialog({
                 setForm({
                     title: '',
                     description: '',
-                    due_at: getLocalDayString(new Date()), // Default to today in local time
+                    due_at: toLocalDayString(new Date()),
                 })
 
                 if (defaultClientId) {
                     setSelectedClientId(defaultClientId)
                     supabase.from('clients').select('name').eq('id', defaultClientId).maybeSingle().then(cRes => {
-                        if (cRes.data) setDefaultSearch(cRes.data.name)
+                        if (!cancelled && cRes.data) setDefaultSearch(cRes.data.name)
                     })
                 } else {
                     setSelectedClientId('')
@@ -96,6 +99,8 @@ export default function TaskDialog({
             }
             setError(null)
             setSaving(false)
+
+            return () => { cancelled = true }
         }
     }, [isOpen, taskToEdit, defaultClientId, orgId])
 
@@ -113,7 +118,6 @@ export default function TaskDialog({
             let dueAtISO = null
             if (form.due_at) {
                 const [year, month, day] = form.due_at.split('-').map(Number)
-                // Set due time to the absolute end of the selected day in local time
                 dueAtISO = new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
             }
 
@@ -132,7 +136,7 @@ export default function TaskDialog({
                 const taskInput: TaskInsert = {
                     org_id: orgId,
                     owner_id: user.id,
-                    assignee_id: user.id, // Assign to self by default
+                    assignee_id: user.id,
                     title: form.title.trim(),
                     description: form.description.trim() || null,
                     status: 'todo',
@@ -149,8 +153,10 @@ export default function TaskDialog({
             onSaved()
             onClose()
         } catch (err: unknown) {
-            setError((err as Error).message || 'Failed to save task')
-            setSaving(false)
+            if (mountedRef.current) {
+                setError((err as Error).message || 'Failed to save task')
+                setSaving(false)
+            }
         }
     }
 

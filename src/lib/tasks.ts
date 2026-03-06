@@ -52,23 +52,17 @@ export async function getTasks(options: GetTasksOptions) {
     // We can use an inner join with links table using PostgREST syntax if needed.
     // Let's implement that.
     if (options.clientId) {
-        // Fetch tasks linked directly to the client
-        const { data: clientLinkData, error: clientLinkError } = await supabase
-            .from('links')
-            .select('from_id')
-            .eq('from_type', 'task')
-            .eq('to_type', 'client')
-            .eq('to_id', options.clientId)
+        // Fetch direct client links and client's deals in parallel
+        const [clientLinkRes, clientDealsRes] = await Promise.all([
+            supabase.from('links').select('from_id').eq('from_type', 'task').eq('to_type', 'client').eq('to_id', options.clientId),
+            supabase.from('deals').select('id').eq('client_id', options.clientId),
+        ])
 
-        if (clientLinkError) throw clientLinkError
+        if (clientLinkRes.error) throw clientLinkRes.error
 
-        // Also fetch tasks linked to any deal belonging to this client
-        const { data: clientDeals } = await supabase
-            .from('deals')
-            .select('id')
-            .eq('client_id', options.clientId)
+        const directTaskIds = (clientLinkRes.data ?? []).map((l: { from_id: string }) => l.from_id)
+        const dealIds = (clientDealsRes.data ?? []).map((d: { id: string }) => d.id)
 
-        const dealIds = (clientDeals ?? []).map((d: { id: string }) => d.id)
         let dealTaskIds: string[] = []
         if (dealIds.length > 0) {
             const { data: dealLinkData } = await supabase
@@ -80,10 +74,7 @@ export async function getTasks(options: GetTasksOptions) {
             dealTaskIds = (dealLinkData ?? []).map((l: { from_id: string }) => l.from_id)
         }
 
-        const taskIds = Array.from(new Set([
-            ...clientLinkData.map((l: { from_id: string }) => l.from_id),
-            ...dealTaskIds,
-        ]))
+        const taskIds = Array.from(new Set([...directTaskIds, ...dealTaskIds]))
 
         if (taskIds.length === 0) return []
         query = query.in('id', taskIds)

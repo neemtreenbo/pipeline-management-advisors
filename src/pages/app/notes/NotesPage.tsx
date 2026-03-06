@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { supabase } from '@/lib/supabase'
-import { getNotesByOrg, createNote, getClientsForNotes } from '@/lib/notes'
+import { getNotesByOrgPaginated, createNote, getClientsForNotes } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
+import { extractTextFromContent } from '@/lib/extract-text'
 import { Button } from '@/components/ui/button'
 
 function getInitials(name: string) {
@@ -13,25 +13,7 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function extractTextFromContent(content: any): string {
-    if (!content || !Array.isArray(content)) return ''
-    const texts: string[] = []
-    for (const block of content) {
-        if (Array.isArray(block.content)) {
-            for (const inline of block.content) {
-                if (inline.type === 'text' && inline.text) texts.push(inline.text)
-            }
-        }
-        if (Array.isArray(block.children)) {
-            const childText = extractTextFromContent(block.children)
-            if (childText) texts.push(childText)
-        }
-        if (texts.join(' ').length > 200) break
-    }
-    return texts.join(' ').trim()
-}
-
-function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[] }) {
+const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[] }) {
     const [isExpanded, setIsExpanded] = useState(true)
 
     return (
@@ -58,71 +40,122 @@ function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { c
 
             {isExpanded && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
-                    {notes.map((note) => {
-                        const preview = extractTextFromContent(note.content)
-                        return (
-                            <Link
-                                key={note.id}
-                                to={`/app/notes/${note.id}`}
-                                className="relative flex flex-col rounded-xl border border-border bg-card p-4 group transition-all duration-150 hover:-translate-y-1 hover:shadow-md hover:scale-[1.015] hover:border-border overflow-hidden"
-                            >
-                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                                <div className="flex items-start justify-between gap-2 mb-1">
-                                    <h3 className="text-sm font-semibold text-foreground line-clamp-1 leading-snug group-hover:text-accent transition-colors duration-300">
-                                        {note.title || 'Untitled Note'}
-                                    </h3>
-                                    <FileText size={14} className="text-muted-foreground/50 group-hover:text-accent/60 transition-colors duration-300 shrink-0 mt-0.5" />
-                                </div>
-
-                                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3 min-h-[48px]">
-                                    {preview || 'No content yet…'}
-                                </p>
-
-                                <p className="text-[11px] text-muted-foreground/60 mt-auto">
-                                    {new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </p>
-                            </Link>
-                        )
-                    })}
+                    {notes.map((note) => (
+                        <NoteCard key={note.id} note={note} />
+                    ))}
                 </div>
             )}
         </div>
     )
-}
+})
+
+const NoteCard = memo(function NoteCard({ note }: { note: Note }) {
+    const preview = useMemo(() => extractTextFromContent(note.content), [note.content])
+
+    return (
+        <Link
+            to={`/app/notes/${note.id}`}
+            className="relative flex flex-col rounded-xl border border-border bg-card p-4 group transition-all duration-150 hover:-translate-y-1 hover:shadow-md hover:scale-[1.015] hover:border-border overflow-hidden"
+        >
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent/0 via-accent/80 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            <div className="flex items-start justify-between gap-2 mb-1">
+                <h3 className="text-sm font-semibold text-foreground line-clamp-1 leading-snug group-hover:text-accent transition-colors duration-300">
+                    {note.title || 'Untitled Note'}
+                </h3>
+                <FileText size={14} className="text-muted-foreground/50 group-hover:text-accent/60 transition-colors duration-300 shrink-0 mt-0.5" />
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3 min-h-[48px]">
+                {preview || 'No content yet…'}
+            </p>
+
+            <p className="text-[11px] text-muted-foreground/60 mt-auto">
+                {new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+        </Link>
+    )
+})
 
 export default function NotesPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
     const navigate = useNavigate()
+    const PAGE_SIZE = 24
     const [notes, setNotes] = useState<Note[]>([])
     const [noteClients, setNoteClients] = useState<Record<string, NoteClientInfo>>({})
     const [loading, setLoading] = useState(true)
+    const [hasMore, setHasMore] = useState(false)
+    const [cursor, setCursor] = useState<string | null>(null)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const mountedRef = useRef(true)
+
+    useEffect(() => {
+        mountedRef.current = true
+        return () => { mountedRef.current = false }
+    }, [])
+
+    // Load client metadata for a batch of notes (non-blocking)
+    const loadClientInfo = useCallback(async (noteIds: string[], cancelled: { current: boolean }) => {
+        if (noteIds.length === 0) return
+        try {
+            const clientInfos = await getClientsForNotes(noteIds)
+            if (cancelled.current) return
+            setNoteClients(prev => {
+                const merged = { ...prev }
+                clientInfos.forEach(c => { merged[c.noteId] = c })
+                return merged
+            })
+        } catch {
+            // Client metadata is non-critical — notes still display
+        }
+    }, [])
 
     useEffect(() => {
         if (!orgId) return
-        loadNotes()
-    }, [orgId])
+        const cancelled = { current: false }
 
-    async function loadNotes() {
-        if (!orgId) return
-        setLoading(true)
-        try {
-            const data = await getNotesByOrg(orgId)
-            setNotes(data)
+        async function loadNotes() {
+            setLoading(true)
+            try {
+                // Phase 1: Load first page of notes — render immediately
+                const result = await getNotesByOrgPaginated(orgId!, PAGE_SIZE)
+                if (cancelled.current) return
+                setNotes(result.notes)
+                setHasMore(result.hasMore)
+                setCursor(result.nextCursor)
+                setLoading(false)
 
-            if (data.length > 0) {
-                const clientInfos = await getClientsForNotes(data.map(n => n.id))
-                const clientMap: Record<string, NoteClientInfo> = {}
-                clientInfos.forEach(c => clientMap[c.noteId] = c)
-                setNoteClients(clientMap)
+                // Phase 2: Load client metadata in background
+                loadClientInfo(result.notes.map(n => n.id), cancelled)
+            } catch (error) {
+                console.error('Failed to load notes', error)
+                if (!cancelled.current) setLoading(false)
             }
-        } catch (error) {
-            console.error('Failed to load notes', error)
-        } finally {
-            setLoading(false)
         }
-    }
+
+        loadNotes()
+        return () => { cancelled.current = true }
+    }, [orgId, loadClientInfo])
+
+    const loadMore = useCallback(async () => {
+        if (!orgId || !hasMore || loadingMore) return
+        setLoadingMore(true)
+        try {
+            const result = await getNotesByOrgPaginated(orgId, PAGE_SIZE, cursor)
+            setNotes(prev => [...prev, ...result.notes])
+            setHasMore(result.hasMore)
+            setCursor(result.nextCursor)
+
+            // Fetch client info for the new batch
+            const cancelled = { current: false }
+            loadClientInfo(result.notes.map(n => n.id), cancelled)
+        } catch (error) {
+            console.error('Failed to load more notes', error)
+        } finally {
+            setLoadingMore(false)
+        }
+    }, [orgId, hasMore, cursor, loadingMore, loadClientInfo])
 
     const handleCreateNote = useCallback(async () => {
         if (!orgId || !user) return
@@ -134,31 +167,26 @@ export default function NotesPage() {
         }
     }, [orgId, user, navigate])
 
-    const filteredNotes = notes
+    const sortedGroups = useMemo(() => {
+        const grouped = notes.reduce((acc, note) => {
+            const clientInfo = noteClients[note.id]
+            const groupKey = clientInfo ? clientInfo.clientId : 'unassigned'
+            const groupName = clientInfo ? clientInfo.clientName : 'Standalone Notes'
+            const profilePictureUrl = clientInfo?.profilePictureUrl ?? null
 
-    const groupedNotes = filteredNotes.reduce((acc, note) => {
-        const clientInfo = noteClients[note.id]
-        const groupKey = clientInfo ? clientInfo.clientId : 'unassigned'
-        const groupName = clientInfo ? clientInfo.clientName : 'Standalone Notes'
-        const profilePictureUrl = clientInfo?.profilePictureUrl ?? null
-
-        if (!acc[groupKey]) {
-            acc[groupKey] = {
-                id: groupKey,
-                name: groupName,
-                profilePictureUrl,
-                notes: []
+            if (!acc[groupKey]) {
+                acc[groupKey] = { id: groupKey, name: groupName, profilePictureUrl, notes: [] }
             }
-        }
-        acc[groupKey].notes.push(note)
-        return acc
-    }, {} as Record<string, { id: string, name: string, profilePictureUrl: string | null, notes: Note[] }>)
+            acc[groupKey].notes.push(note)
+            return acc
+        }, {} as Record<string, { id: string, name: string, profilePictureUrl: string | null, notes: Note[] }>)
 
-    const sortedGroups = Object.values(groupedNotes).sort((a, b) => {
-        if (a.id === 'unassigned') return 1
-        if (b.id === 'unassigned') return -1
-        return a.name.localeCompare(b.name)
-    })
+        return Object.values(grouped).sort((a, b) => {
+            if (a.id === 'unassigned') return 1
+            if (b.id === 'unassigned') return -1
+            return a.name.localeCompare(b.name)
+        })
+    }, [notes, noteClients])
 
     return (
         <div className="min-h-screen bg-transparent pt-6">
@@ -177,7 +205,7 @@ export default function NotesPage() {
                                 <div key={i} className="h-40 rounded-xl bg-muted animate-pulse" />
                             ))}
                         </div>
-                    ) : filteredNotes.length === 0 ? (
+                    ) : notes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-24 text-center">
                             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                                 <FileText size={24} className="text-muted-foreground" />
@@ -196,6 +224,19 @@ export default function NotesPage() {
                             {sortedGroups.map((group) => (
                                 <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} />
                             ))}
+
+                            {hasMore && (
+                                <div className="flex justify-center pt-4 pb-2">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={loadMore}
+                                        disabled={loadingMore}
+                                        className="h-8 text-xs rounded-full px-5 font-medium"
+                                    >
+                                        {loadingMore ? 'Loading…' : 'Load more'}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
             </div>

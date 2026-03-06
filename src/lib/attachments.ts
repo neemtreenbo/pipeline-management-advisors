@@ -138,6 +138,33 @@ export async function dealHasProposal(dealId: string): Promise<boolean> {
     return (count ?? 0) > 0
 }
 
+/** Fetch attachment counts for multiple deals in a single query */
+export async function fetchAttachmentCountsByDeals(
+    dealIds: string[]
+): Promise<Record<string, { proposal: number; total: number }>> {
+    if (dealIds.length === 0) return {}
+
+    const { data, error } = await supabase
+        .from('deal_attachments')
+        .select('deal_id, file_type')
+        .in('deal_id', dealIds)
+
+    if (error) throw error
+
+    const counts: Record<string, { proposal: number; total: number }> = {}
+    for (const id of dealIds) {
+        counts[id] = { proposal: 0, total: 0 }
+    }
+    for (const row of data ?? []) {
+        const c = counts[row.deal_id]
+        if (c) {
+            c.total++
+            if (row.file_type === 'proposal') c.proposal++
+        }
+    }
+    return counts
+}
+
 /** Format file size for display */
 export function formatFileSize(bytes: number | null): string {
     if (!bytes) return '—'

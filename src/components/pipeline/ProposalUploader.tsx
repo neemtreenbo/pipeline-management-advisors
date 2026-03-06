@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { FileText, Image, Trash2, ExternalLink, AlertTriangle, UploadCloud } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import type { DealAttachment, FileType } from '@/lib/attachments'
@@ -36,8 +36,8 @@ export default function ProposalUploader({
     const [uploadError, setUploadError] = useState<string | null>(null)
     const [deletingId, setDeletingId] = useState<string | null>(null)
 
-    const proposals = attachments.filter((a) => a.file_type === 'proposal')
-    const supporting = attachments.filter((a) => a.file_type === 'supporting_document')
+    const proposals = useMemo(() => attachments.filter((a) => a.file_type === 'proposal'), [attachments])
+    const supporting = useMemo(() => attachments.filter((a) => a.file_type === 'supporting_document'), [attachments])
 
     const stagesNeedingProposal = ['Proposal Presented', 'Decision Pending']
     const isMissingProposal = stagesNeedingProposal.includes(dealStage) && proposals.length === 0

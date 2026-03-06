@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -26,6 +26,88 @@ type InlineEdit = {
     field: 'name' | 'email' | 'phone' | 'source'
     value: string
 }
+
+interface InlineCellProps {
+    client: Client
+    field: InlineEdit['field']
+    display: React.ReactNode
+    placeholder: string
+    isEditing: boolean
+    editValue: string
+    onEditChange: (value: string) => void
+    onSave: () => void
+    onCancel: () => void
+    onStartEdit: (client: Client, field: InlineEdit['field']) => void
+    inputRef?: React.RefObject<HTMLInputElement | null>
+}
+
+const InlineCell = memo(function InlineCell({
+    client,
+    field,
+    display,
+    placeholder,
+    isEditing,
+    editValue,
+    onEditChange,
+    onSave,
+    onCancel,
+    onStartEdit,
+    inputRef,
+}: InlineCellProps) {
+    if (field === 'source') {
+        return (
+            <div className="relative">
+                {isEditing ? (
+                    <select
+                        autoFocus
+                        value={editValue}
+                        onChange={e => onEditChange(e.target.value)}
+                        onBlur={onSave}
+                        onKeyDown={e => { if (e.key === 'Escape') onCancel() }}
+                        className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                    >
+                        {SOURCE_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <div
+                        className="cursor-pointer rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
+                        onClick={() => onStartEdit(client, field)}
+                    >
+                        {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    return (
+        <div className="relative">
+            {isEditing ? (
+                <input
+                    ref={inputRef}
+                    value={editValue}
+                    onChange={e => onEditChange(e.target.value)}
+                    onBlur={onSave}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') onSave()
+                        if (e.key === 'Escape') onCancel()
+                    }}
+                    placeholder={placeholder}
+                    className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
+                />
+            ) : (
+                <div
+                    className="cursor-text rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
+                    onClick={() => onStartEdit(client, field)}
+                >
+                    {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
+                </div>
+            )}
+        </div>
+    )
+})
 
 const SOURCE_OPTIONS = [
     { value: '', label: 'None' },
@@ -165,79 +247,24 @@ const [clients, setClients] = useState<Client[]>([])
         })
     }
 
-    const filtered = clients
+    const sorted = useMemo(() => {
+        return [...clients].sort((a, b) => {
+            const valA = (a[sortField] || '').toLowerCase()
+            const valB = (b[sortField] || '').toLowerCase()
 
-    const sorted = [...filtered].sort((a, b) => {
-        const valA = (a[sortField] || '').toLowerCase()
-        const valB = (b[sortField] || '').toLowerCase()
+            if (valA < valB) return sortDir === 'asc' ? -1 : 1
+            if (valA > valB) return sortDir === 'asc' ? 1 : -1
+            return 0
+        })
+    }, [clients, sortField, sortDir])
 
-        if (valA < valB) return sortDir === 'asc' ? -1 : 1
-        if (valA > valB) return sortDir === 'asc' ? 1 : -1
-        return 0
-    })
+    const handleEditChange = useCallback((value: string) => {
+        setInlineEdit(prev => prev ? { ...prev, value } : prev)
+    }, [])
 
-    function InlineCell({ client, field, display, placeholder }: {
-        client: Client
-        field: InlineEdit['field']
-        display: React.ReactNode
-        placeholder: string
-    }) {
-        const isEditing = inlineEdit?.id === client.id && inlineEdit?.field === field
-
-        if (field === 'source') {
-            return (
-                <div className="relative">
-                    {isEditing ? (
-                        <select
-                            autoFocus
-                            value={inlineEdit?.value ?? ''}
-                            onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : prev)}
-                            onBlur={saveInlineEdit}
-                            onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null) }}
-                            className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
-                        >
-                            {SOURCE_OPTIONS.map(o => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
-                    ) : (
-                        <div
-                            className="cursor-pointer rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
-                            onClick={() => startEdit(client, field)}
-                        >
-                            {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
-                        </div>
-                    )}
-                </div>
-            )
-        }
-
-        return (
-            <div className="relative">
-                {isEditing ? (
-                    <input
-                        ref={inlineInputRef}
-                        value={inlineEdit?.value ?? ''}
-                        onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : prev)}
-                        onBlur={saveInlineEdit}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter') saveInlineEdit()
-                            if (e.key === 'Escape') setInlineEdit(null)
-                        }}
-                        placeholder={placeholder}
-                        className="w-full text-[13px] bg-background border border-border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all"
-                    />
-                ) : (
-                    <div
-                        className="cursor-text rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center"
-                        onClick={() => startEdit(client, field)}
-                    >
-                        {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
-                    </div>
-                )}
-            </div>
-        )
-    }
+    const handleCancelEdit = useCallback(() => {
+        setInlineEdit(null)
+    }, [])
 
     const showTable = !loading && (sorted.length > 0 || addingNew)
 
@@ -438,6 +465,12 @@ const [clients, setClients] = useState<Client[]>([])
                                                 ) : null
                                             }
                                             placeholder="—"
+                                            isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'source'}
+                                            editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'source' ? inlineEdit.value : ''}
+                                            onEditChange={handleEditChange}
+                                            onSave={saveInlineEdit}
+                                            onCancel={handleCancelEdit}
+                                            onStartEdit={startEdit}
                                         />
                                     </div>
 
@@ -455,6 +488,13 @@ const [clients, setClients] = useState<Client[]>([])
                                                 ) : null
                                             }
                                             placeholder="—"
+                                            isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'email'}
+                                            editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'email' ? inlineEdit.value : ''}
+                                            onEditChange={handleEditChange}
+                                            onSave={saveInlineEdit}
+                                            onCancel={handleCancelEdit}
+                                            onStartEdit={startEdit}
+                                            inputRef={inlineInputRef}
                                         />
                                     </div>
 
@@ -472,6 +512,13 @@ const [clients, setClients] = useState<Client[]>([])
                                                 ) : null
                                             }
                                             placeholder="—"
+                                            isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'phone'}
+                                            editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'phone' ? inlineEdit.value : ''}
+                                            onEditChange={handleEditChange}
+                                            onSave={saveInlineEdit}
+                                            onCancel={handleCancelEdit}
+                                            onStartEdit={startEdit}
+                                            inputRef={inlineInputRef}
                                         />
                                     </div>
 

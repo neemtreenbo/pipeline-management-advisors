@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOrg } from '@/contexts/OrgContext'
 import { supabase } from '@/lib/supabase'
 import {
     PIPELINE_STAGES,
@@ -42,13 +43,13 @@ interface DealDetailsModalProps {
 
 export default function DealDetailsModal({ dealId, onClose, onStageChange, onDeleted }: DealDetailsModalProps) {
     const { user } = useAuth()
+    const { orgId } = useOrg()
 
     const [deal, setDeal] = useState<Deal | null>(null)
     const [attachments, setAttachments] = useState<DealAttachment[]>([])
     const [activities, setActivities] = useState<Array<{
         id: string; event_type: string; data: Record<string, unknown>; created_at: string; actor_id: string
     }>>([])
-    const [orgId, setOrgId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>('tasks')
     const [editingStage, setEditingStage] = useState(false)
@@ -58,20 +59,6 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     const [titleDraft, setTitleDraft] = useState('')
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
-
-    useEffect(() => {
-        if (!user) return
-        supabase
-            .from('memberships')
-            .select('org_id')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) setOrgId(data.org_id)
-            })
-    }, [user])
 
     const loadDeal = useCallback(async () => {
         if (!dealId) return
@@ -416,39 +403,45 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                         </div>
                     </div>
 
-                    {/* Tab content */}
+                    {/* Tab content — keep mounted, toggle visibility to preserve state */}
                     <div className="overflow-y-auto px-6 py-5 flex-1">
-                        {activeTab === 'tasks' && dealId && orgId && (
-                            <EntityTasks
-                                dealId={dealId}
-                                orgId={orgId}
-                                inlineAdd
-                                onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
-                            />
-                        )}
-                        {activeTab === 'proposals' && orgId && user && (
-                            <ProposalUploader
-                                dealId={deal.id}
-                                orgId={orgId}
-                                uploadedBy={user.id}
-                                attachments={attachments}
-                                onUploaded={handleAttachmentUploaded}
-                                onDeleted={handleAttachmentDeleted}
-                                dealStage={deal.stage}
-                            />
-                        )}
-                        {activeTab === 'notes' && dealId && orgId && (
-                            <NotesList
-                                entityType="deal"
-                                entityId={dealId}
-                                orgId={orgId}
-                                inlineAdd
-                                onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
-                            />
-                        )}
-                        {activeTab === 'activity' && (
+                        <div className={activeTab === 'tasks' ? '' : 'hidden'}>
+                            {dealId && orgId && (
+                                <EntityTasks
+                                    dealId={dealId}
+                                    orgId={orgId}
+                                    inlineAdd
+                                    onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                                />
+                            )}
+                        </div>
+                        <div className={activeTab === 'proposals' ? '' : 'hidden'}>
+                            {orgId && user && (
+                                <ProposalUploader
+                                    dealId={deal.id}
+                                    orgId={orgId}
+                                    uploadedBy={user.id}
+                                    attachments={attachments}
+                                    onUploaded={handleAttachmentUploaded}
+                                    onDeleted={handleAttachmentDeleted}
+                                    dealStage={deal.stage}
+                                />
+                            )}
+                        </div>
+                        <div className={activeTab === 'notes' ? '' : 'hidden'}>
+                            {dealId && orgId && (
+                                <NotesList
+                                    entityType="deal"
+                                    entityId={dealId}
+                                    orgId={orgId}
+                                    inlineAdd
+                                    onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                                />
+                            )}
+                        </div>
+                        <div className={activeTab === 'activity' ? '' : 'hidden'}>
                             <ActivityTimeline activities={activities} />
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>
