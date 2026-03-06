@@ -9,7 +9,7 @@ import {
 import { Link } from 'react-router-dom'
 
 
-interface ActivityRecord {
+export interface ActivityRecord {
     id: string
     event_type: string
     entity_type?: string
