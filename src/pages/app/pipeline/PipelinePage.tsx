@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { Search } from 'lucide-react'
 import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import {
@@ -36,12 +38,24 @@ export default function PipelinePage() {
     const dealsRef = useRef(deals)
     dealsRef.current = deals
 
+    const [searchQuery, setSearchQuery] = useState('')
+
     const dealsByStage = useMemo(() => {
+        const q = searchQuery.toLowerCase().trim()
+
+        const filtered = q
+            ? deals.filter(deal => {
+                const title = ((deal.data as Record<string, string>)?.title || '').toLowerCase()
+                const clientName = (deal.client?.name || '').toLowerCase()
+                return title.includes(q) || clientName.includes(q)
+            })
+            : deals
+
         const grouped: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
             (acc, stage) => ({ ...acc, [stage]: [] }),
             {} as Record<DealStage, Deal[]>
         )
-        const sorted = [...deals].sort((a, b) => {
+        const sorted = [...filtered].sort((a, b) => {
             if (a.order_index === b.order_index) {
                 return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             }
@@ -53,7 +67,12 @@ export default function PipelinePage() {
             }
         })
         return grouped
-    }, [deals])
+    }, [deals, searchQuery])
+
+    const filteredCount = useMemo(() =>
+        Object.values(dealsByStage).reduce((s, arr) => s + arr.length, 0),
+        [dealsByStage]
+    )
 
     async function handleDragEnd(result: DropResult) {
         const { source, destination, draggableId } = result
@@ -152,6 +171,27 @@ export default function PipelinePage() {
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">
+            {/* Header with search */}
+            {!loading && deals.length > 0 && (
+                <div className="max-w-5xl mx-auto w-full px-6 pt-6 pb-0 flex items-center gap-4">
+                    <h1 className="text-lg font-semibold text-foreground leading-none flex items-center gap-2">
+                        Pipeline
+                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-normal bg-muted text-muted-foreground">
+                            {searchQuery.trim() ? `${filteredCount} / ${deals.length}` : deals.length}
+                        </span>
+                    </h1>
+                    <div className="relative max-w-sm">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
+                        <Input
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Search deals..."
+                            className="h-8 pl-8 text-sm rounded-lg w-64"
+                        />
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex gap-4 px-6 py-8 overflow-x-auto w-full h-full">
                     {PIPELINE_STAGES.map((stage) => (

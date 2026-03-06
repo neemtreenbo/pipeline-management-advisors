@@ -76,11 +76,11 @@ export default memo(function KanbanColumn({
 
     return (
         <div
-            className="flex flex-col bg-muted dark:bg-muted/50 rounded-xl p-3 min-w-[280px] w-72 shrink-0 max-h-[calc(100vh-140px)] overflow-y-auto"
+            className="flex flex-col bg-black/[0.06] dark:bg-muted/50 rounded-xl min-w-[280px] w-72 shrink-0 max-h-[calc(100vh-140px)]"
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
-            {/* Column header */}
-            <div className="sticky -top-3 z-10 flex items-center justify-between mb-3 pb-1 pt-3 -mt-3 -mx-3 px-3 bg-muted dark:bg-[hsl(var(--muted))] rounded-t-xl">
+            {/* Column header — always visible */}
+            <div className="flex items-center justify-between px-3 pt-3 pb-2">
                 <div className="flex items-center gap-2">
                     <span
                         className="w-2 h-2 rounded-full shrink-0"
@@ -105,76 +105,90 @@ export default memo(function KanbanColumn({
                 </button>
             </div>
 
-            {/* Inline add deal form */}
-            <AnimatePresence>
-                {isAdding && (
-                    <div className="mb-2">
-                        <InlineAddDeal
-                            stage={stage}
-                            onCreated={(input) => {
-                                onCreateDeal(input)
-                                setIsAdding(false)
-                            }}
-                            onCancel={() => setIsAdding(false)}
-                        />
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto px-3">
+                {/* Inline add deal form */}
+                <AnimatePresence>
+                    {isAdding && (
+                        <div className="mb-2">
+                            <InlineAddDeal
+                                stage={stage}
+                                onCreated={(input) => {
+                                    onCreateDeal(input)
+                                    setIsAdding(false)
+                                }}
+                                onCancel={() => setIsAdding(false)}
+                            />
+                        </div>
+                    )}
+                </AnimatePresence>
 
-            {/* Deal cards grouped by client */}
-            <Droppable droppableId={stage}>
-                {(provided, snapshot) => (
-                    <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`flex flex-col gap-3 flex-1 min-h-[120px] rounded-lg transition-all duration-150 ${
-                            snapshot.isDraggingOver ? 'ring-1 ring-border bg-muted/30' : ''
-                        }`}
-                    >
-                        {clientGroups.map((group) => (
-                            <div key={group.clientId} className="flex flex-col gap-1.5">
-                                {/* Client header */}
-                                <div className="flex items-center gap-2 px-1 pt-1">
-                                    <ClientAvatar
-                                        name={group.clientName}
-                                        profilePictureUrl={group.profilePictureUrl}
-                                        size="sm"
-                                    />
-                                    <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground/70 truncate">
-                                        {group.clientName}
-                                    </span>
+                {/* Deal cards grouped by client */}
+                <Droppable droppableId={stage}>
+                    {(provided, snapshot) => (
+                        <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`flex flex-col gap-3 flex-1 min-h-[120px] rounded-lg transition-all duration-150 ${
+                                snapshot.isDraggingOver ? 'ring-1 ring-border bg-muted/30' : ''
+                            }`}
+                        >
+                            {clientGroups.map((group) => (
+                                <div key={group.clientId} className="flex flex-col gap-1.5">
+                                    {/* Client header */}
+                                    <div className="flex items-center gap-2 px-1 pt-1">
+                                        <ClientAvatar
+                                            name={group.clientName}
+                                            profilePictureUrl={group.profilePictureUrl}
+                                            size="sm"
+                                        />
+                                        <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground/70 truncate">
+                                            {group.clientName}
+                                        </span>
+                                    </div>
+
+                                    {/* Deals for this client */}
+                                    <div className="flex flex-col gap-1.5 pl-1 border-l-2 border-border dark:border-border/30 ml-3">
+                                        {group.deals.map((deal) => {
+                                            const counts = attachmentCounts[deal.id] ?? { proposal: 0, total: 0 }
+                                            return (
+                                                <DealCard
+                                                    key={deal.id}
+                                                    deal={deal}
+                                                    index={flatIndexMap.get(deal.id) ?? 0}
+                                                    proposalCount={counts.proposal}
+                                                    attachmentCount={counts.total}
+                                                    stageHistory={stageHistories[deal.id] ?? []}
+                                                    onStageChange={onStageChange}
+                                                    onDeleted={onDealDeleted}
+                                                />
+                                            )
+                                        })}
+                                    </div>
                                 </div>
+                            ))}
+                            {provided.placeholder}
 
-                                {/* Deals for this client */}
-                                <div className="flex flex-col gap-1.5 pl-1 border-l-2 border-border dark:border-border/30 ml-3">
-                                    {group.deals.map((deal) => {
-                                        const counts = attachmentCounts[deal.id] ?? { proposal: 0, total: 0 }
-                                        return (
-                                            <DealCard
-                                                key={deal.id}
-                                                deal={deal}
-                                                index={flatIndexMap.get(deal.id) ?? 0}
-                                                proposalCount={counts.proposal}
-                                                attachmentCount={counts.total}
-                                                stageHistory={stageHistories[deal.id] ?? []}
-                                                onStageChange={onStageChange}
-                                                onDeleted={onDealDeleted}
-                                            />
-                                        )
-                                    })}
+                            {deals.length === 0 && !snapshot.isDraggingOver && (
+                                <div className="flex-1 flex items-center justify-center min-h-[80px]">
+                                    <span className="text-xs text-muted-foreground/40">No deals</span>
                                 </div>
-                            </div>
-                        ))}
-                        {provided.placeholder}
+                            )}
+                        </div>
+                    )}
+                </Droppable>
+            </div>
 
-                        {deals.length === 0 && !snapshot.isDraggingOver && (
-                            <div className="flex-1 flex items-center justify-center min-h-[80px]">
-                                <span className="text-xs text-muted-foreground/40">No deals</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </Droppable>
+            {/* Bottom bar — always visible */}
+            <div className="px-3 pt-2 pb-3">
+                <button
+                    onClick={() => setIsAdding(true)}
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-xs font-medium text-muted-foreground/70 hover:text-foreground hover:bg-background/60 dark:hover:bg-background/20 transition-colors duration-150"
+                >
+                    <Plus size={13} />
+                    Add deal
+                </button>
+            </div>
         </div>
     )
 })
