@@ -33,24 +33,16 @@ const MIN_NODE_DISTANCE = 180
 // ── Public API ──
 
 /**
- * Main layout entry point.
- * - 'force' (default): cluster-based layout for org-wide network
- * - 'radial': focused node at center with single ring (for client detail page)
+ * Main layout entry point — cluster-based layout for org-wide network.
+ * Hub nodes at center, neighbors clustered by relationship type in zones.
  */
 export async function applyElkLayout(
   nodes: Node[],
   edges: LayoutEdge[],
-  options: { algorithm?: 'force' | 'radial' } = {}
 ): Promise<Node[]> {
   if (nodes.length === 0) return []
   if (nodes.length === 1) {
     return [{ ...nodes[0], position: { x: 0, y: 0 } }]
-  }
-
-  const algorithm = options.algorithm ?? 'force'
-
-  if (algorithm === 'radial') {
-    return layoutRadial(nodes, edges)
   }
 
   return layoutClustered(nodes, edges)
@@ -281,41 +273,6 @@ function layoutClustered(nodes: Node[], edges: LayoutEdge[]): Node[] {
 
   // Overlap resolution
   resolveOverlaps(result)
-
-  return result
-}
-
-// ── Private: Radial Layout (for client detail page) ──
-
-/**
- * Simple mind-map: focused node at center, others evenly spaced in a ring.
- * Deterministic positions based on count. No saved positions needed.
- */
-function layoutRadial(nodes: Node[], _edges: LayoutEdge[]): Node[] {
-  const focused = nodes.find((n) => (n.data as Record<string, unknown>)?.isFocused)
-  const others = nodes.filter((n) => n !== focused)
-  const result: Node[] = []
-
-  if (focused) {
-    result.push({ ...focused, position: { x: 0, y: 0 } })
-  }
-
-  if (others.length === 0) return result
-
-  const n = others.length
-  const RADIUS = 250
-
-  for (let i = 0; i < n; i++) {
-    // Start from top (-π/2), distribute evenly around the circle
-    const angle = -Math.PI / 2 + (2 * Math.PI * i) / n
-    result.push({
-      ...others[i],
-      position: {
-        x: Math.cos(angle) * RADIUS,
-        y: Math.sin(angle) * RADIUS,
-      },
-    })
-  }
 
   return result
 }

@@ -194,7 +194,6 @@ export default function NetworkPage() {
           <RelationshipGraph
             nodes={nodes}
             edges={edges}
-            layoutAlgorithm="force"
             className="h-full"
             savedPositions={savedPositions}
             onPositionsChange={handlePositionsChange}

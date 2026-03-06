@@ -20,7 +20,7 @@ import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
 import ClientRelationships from '@/components/clients/ClientRelationships'
-import ClientRelationshipGraph from '@/components/graph/ClientRelationshipGraph'
+import Mindmap from '@/components/mindmap'
 
 function formatSource(src: string | null) {
     if (!src) return '—'
@@ -780,7 +780,7 @@ export default function ClientDetailPage() {
 
                     {/* Mindmap */}
                     <TabsContent value="mindmap">
-                        <ClientRelationshipGraph clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
+                        <Mindmap clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
                     </TabsContent>
                 </div >
             </Tabs >

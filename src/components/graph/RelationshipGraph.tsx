@@ -15,15 +15,13 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import ClientNode from './ClientNode'
-import EntityNode from './EntityNode'
-import GroupNode from './GroupNode'
 import ConnectionTypePopover from './ConnectionTypePopover'
 import AddClientPopover from './AddClientPopover'
 import type { ClientNodeData } from '@/hooks/useGraphData'
 import { applyElkLayout, placeNewNodesInSlots, type LayoutEdge } from '@/lib/graphLayout'
 import type { NetworkPositions, ClientRelationType } from '@/lib/clientRelationships'
 
-const NODE_TYPES = { clientNode: ClientNode, entityNode: EntityNode, groupNode: GroupNode }
+const NODE_TYPES = { clientNode: ClientNode }
 
 /**
  * For each edge, pick the handle (top/right/bottom/left) on source and target
@@ -123,7 +121,6 @@ type PopoverState =
 interface RelationshipGraphProps {
   nodes: Node<ClientNodeData>[]
   edges: Edge[]
-  layoutAlgorithm?: 'force' | 'radial'
   className?: string
   savedPositions?: NetworkPositions | null
   onPositionsChange?: (positions: NetworkPositions) => void
@@ -137,7 +134,6 @@ interface RelationshipGraphProps {
 function RelationshipGraphInner({
   nodes: initialNodes,
   edges: initialEdges,
-  layoutAlgorithm = 'force',
   className,
   savedPositions,
   onPositionsChange,
@@ -199,7 +195,7 @@ function RelationshipGraphInner({
     if (withPosition.length === 0) {
       // All nodes are new — full cluster layout
       setLayoutReady(false)
-      applyElkLayout(withoutPosition, layoutEdges, { algorithm: layoutAlgorithm })
+      applyElkLayout(withoutPosition, layoutEdges)
         .then((laidOut) => {
           applyLayout(laidOut as Node<ClientNodeData>[])
         })
@@ -216,7 +212,7 @@ function RelationshipGraphInner({
     // Place new nodes in slots near their connections
     const placed = placeNewNodesInSlots(withoutPosition, withPosition, layoutEdges)
     applyLayout([...withPosition, ...placed] as Node<ClientNodeData>[])
-  }, [initialNodes, initialEdges, layoutAlgorithm, savedPositions])
+  }, [initialNodes, initialEdges, savedPositions])
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<Node<ClientNodeData>>[]) => {

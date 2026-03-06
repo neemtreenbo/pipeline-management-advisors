@@ -27,7 +27,7 @@ const COLOR_MAP = {
   tasks: { icon: 'text-orange-500', border: 'border-orange-500/30', bg: 'bg-orange-500/5' },
 }
 
-export default memo(function GroupNode({ data }: NodeProps<Node<GroupNodeData>>) {
+export default memo(function MindmapGroupNode({ data }: NodeProps<Node<GroupNodeData>>) {
   const navigate = useNavigate()
   const Icon = ICON_MAP[data.entityType]
   const colors = COLOR_MAP[data.entityType]
@@ -40,12 +40,10 @@ export default memo(function GroupNode({ data }: NodeProps<Node<GroupNodeData>>)
       `}
       style={{ width: 200 }}
     >
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
         <Icon className={`shrink-0 w-4 h-4 ${colors.icon}`} />
         <span className="text-xs font-semibold text-foreground">{data.title}</span>
       </div>
-      {/* Items */}
       <div className="flex flex-col">
         {data.items.map((item, i) => (
           <div
