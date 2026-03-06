@@ -314,6 +314,50 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                         </button>
                                     )}
 
+                                    {/* Due date pill */}
+                                    {editingDueDate ? (
+                                        <div className="flex items-center gap-1 bg-muted/60 border border-border rounded-full px-2.5 py-1">
+                                            <Calendar size={10} className="text-muted-foreground/50 shrink-0" />
+                                            <input
+                                                autoFocus
+                                                type="date"
+                                                className="text-[11px] font-medium text-foreground bg-transparent outline-none w-[110px] tabular-nums"
+                                                value={dueDateDraft}
+                                                onChange={(e) => setDueDateDraft(e.target.value)}
+                                                onBlur={handleDueDateSave}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleDueDateSave()
+                                                    if (e.key === 'Escape') setEditingDueDate(false)
+                                                }}
+                                            />
+                                        </div>
+                                    ) : deal.due_date ? (
+                                        <button
+                                            onClick={() => { setDueDateDraft(deal.due_date ?? ''); setEditingDueDate(true) }}
+                                            className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                                                new Date(deal.due_date) < new Date()
+                                                    ? 'text-destructive bg-destructive/10 hover:bg-destructive/15'
+                                                    : (() => {
+                                                        const diff = Math.ceil((new Date(deal.due_date!).getTime() - Date.now()) / 86400000)
+                                                        return diff <= 7
+                                                            ? 'text-warning bg-warning/10 hover:bg-warning/15'
+                                                            : 'text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted'
+                                                    })()
+                                            }`}
+                                        >
+                                            <Calendar size={10} className="shrink-0" />
+                                            {new Date(deal.due_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setDueDateDraft(''); setEditingDueDate(true) }}
+                                            className="flex items-center gap-1 text-[11px] text-muted-foreground/40 hover:text-muted-foreground bg-muted/40 hover:bg-muted/60 px-2.5 py-1 rounded-full transition-colors"
+                                        >
+                                            <Calendar size={10} />
+                                            Due
+                                        </button>
+                                    )}
+
                                     {/* Stage */}
                                     <div className="relative">
                                         <button
@@ -377,57 +421,19 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                 </div>
                             </div>
 
-                            {/* Dates row */}
-                            <div className="flex items-center gap-4 mt-2">
-                                {deal.expected_close_date && (
-                                    <div className="flex items-center gap-1.5">
-                                        <Calendar size={11} className="text-muted-foreground/40 shrink-0" />
-                                        <span className="text-[11px] text-muted-foreground/50">
-                                            {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                            })}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Due date */}
-                                {editingDueDate ? (
-                                    <div className="flex items-center gap-1">
-                                        <input
-                                            autoFocus
-                                            type="date"
-                                            className="text-[11px] text-foreground bg-transparent border-0 border-b border-foreground/20 focus:ring-0 outline-none transition-colors"
-                                            value={dueDateDraft}
-                                            onChange={(e) => setDueDateDraft(e.target.value)}
-                                            onBlur={handleDueDateSave}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleDueDateSave()
-                                                if (e.key === 'Escape') setEditingDueDate(false)
-                                            }}
-                                        />
-                                    </div>
-                                ) : deal.due_date ? (
-                                    <button
-                                        onClick={() => { setDueDateDraft(deal.due_date ?? ''); setEditingDueDate(true) }}
-                                        className={`flex items-center gap-1 text-[11px] hover:text-foreground transition-colors ${
-                                            new Date(deal.due_date) < new Date() ? 'text-destructive' : 'text-muted-foreground/50'
-                                        }`}
-                                    >
-                                        <Calendar size={11} className="shrink-0" />
-                                        Due {new Date(deal.due_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => { setDueDateDraft(''); setEditingDueDate(true) }}
-                                        className="flex items-center gap-1 text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                                    >
-                                        <Calendar size={11} />
-                                        Set due date
-                                    </button>
-                                )}
-                            </div>
+                            {/* Expected close date */}
+                            {deal.expected_close_date && (
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    <Calendar size={11} className="text-muted-foreground/40 shrink-0" />
+                                    <span className="text-[11px] text-muted-foreground/50">
+                                        Expected close {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Tabs */}
