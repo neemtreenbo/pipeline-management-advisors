@@ -27,6 +27,7 @@ export interface Deal {
     stage: DealStage
     value: number
     order_index?: number
+    due_date: string | null
     expected_close_date: string | null
     data: Record<string, unknown>
     created_at: string
@@ -44,6 +45,7 @@ export interface NewDealInput {
     stage?: DealStage
     value?: number
     expected_close_date?: string | null
+    due_date?: string | null
     title?: string
 }
 
@@ -89,6 +91,7 @@ export async function createDeal(input: NewDealInput): Promise<Deal> {
             stage: input.stage ?? 'Opportunity',
             value: input.value ?? 0,
             expected_close_date: input.expected_close_date ?? null,
+            due_date: input.due_date ?? null,
             data: input.title ? { title: input.title } : {},
         })
         .select(`*, client:clients(id, name, email)`)
@@ -116,7 +119,7 @@ export async function updateDealStage(dealId: string, stage: DealStage, orderInd
 /** Update deal info fields */
 export async function updateDeal(
     dealId: string,
-    updates: Partial<Pick<Deal, 'value' | 'expected_close_date' | 'stage'>> & { title?: string }
+    updates: Partial<Pick<Deal, 'value' | 'expected_close_date' | 'due_date' | 'stage'>> & { title?: string }
 ): Promise<void> {
     const { title, ...rest } = updates
     const patch: Record<string, unknown> = { ...rest }
@@ -193,4 +196,71 @@ export async function fetchDealActivities(dealId: string) {
 
     if (error) throw error
     return data ?? []
+}
+
+/** Stage transition record for Gantt visualization */
+export interface StageTransition {
+    stage: DealStage
+    enteredAt: string
+    daysInStage: number
+}
+
+/** Batch-fetch stage transition histories for multiple deals */
+export async function fetchDealStageHistories(
+    dealIds: string[]
+): Promise<Record<string, StageTransition[]>> {
+    if (dealIds.length === 0) return {}
+
+    const { data, error } = await supabase
+        .from('activities')
+        .select('entity_id, event_type, data, created_at')
+        .eq('entity_type', 'deal')
+        .in('entity_id', dealIds)
+        .in('event_type', ['deal_created', 'deal_stage_changed'])
+        .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    const result: Record<string, StageTransition[]> = {}
+
+    // Group activities by deal
+    const byDeal = new Map<string, typeof data>()
+    for (const row of data ?? []) {
+        if (!byDeal.has(row.entity_id)) byDeal.set(row.entity_id, [])
+        byDeal.get(row.entity_id)!.push(row)
+    }
+
+    const now = Date.now()
+
+    for (const dealId of dealIds) {
+        const activities = byDeal.get(dealId) ?? []
+        const transitions: StageTransition[] = []
+
+        for (let i = 0; i < activities.length; i++) {
+            const act = activities[i]
+            const actData = act.data as Record<string, unknown> | null
+
+            let stage: DealStage
+            if (act.event_type === 'deal_created') {
+                stage = (actData?.stage as DealStage) ?? 'Opportunity'
+            } else {
+                stage = (actData?.to_stage as DealStage) ?? 'Opportunity'
+            }
+
+            const enteredAt = act.created_at!
+            const nextTime = i + 1 < activities.length
+                ? new Date(activities[i + 1].created_at!).getTime()
+                : now
+            const daysInStage = Math.max(
+                1,
+                Math.round((nextTime - new Date(enteredAt).getTime()) / (1000 * 60 * 60 * 24))
+            )
+
+            transitions.push({ stage, enteredAt, daysInStage })
+        }
+
+        result[dealId] = transitions
+    }
+
+    return result
 }

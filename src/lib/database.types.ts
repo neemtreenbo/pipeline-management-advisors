@@ -209,6 +209,7 @@ export type Database = {
           client_id: string
           created_at: string | null
           data: Json | null
+          due_date: string | null
           expected_close_date: string | null
           id: string
           order_index: number | null
@@ -222,6 +223,7 @@ export type Database = {
           client_id: string
           created_at?: string | null
           data?: Json | null
+          due_date?: string | null
           expected_close_date?: string | null
           id?: string
           order_index?: number | null
@@ -235,6 +237,7 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           data?: Json | null
+          due_date?: string | null
           expected_close_date?: string | null
           id?: string
           order_index?: number | null

@@ -10,8 +10,9 @@ import {
     createDeal,
     updateDealStage,
     logDealActivity,
+    fetchDealStageHistories,
 } from '@/lib/deals'
-import type { Deal, DealStage, NewDealInput } from '@/lib/deals'
+import type { Deal, DealStage, NewDealInput, StageTransition } from '@/lib/deals'
 import { fetchAttachmentCountsByDeals } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 import NewDealModal from '@/components/pipeline/NewDealModal'
@@ -28,6 +29,7 @@ export default function PipelinePage() {
     const dealIdFromSearch = searchParams.get('deal')
     const [deals, setDeals] = useState<Deal[]>([])
     const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
+    const [stageHistories, setStageHistories] = useState<Record<string, StageTransition[]>>({})
     const [loading, setLoading] = useState(true)
     const dealsRef = useRef(deals)
     dealsRef.current = deals
@@ -41,13 +43,15 @@ export default function PipelinePage() {
             const data = await fetchDealsByOrg(orgId)
             setDeals(data)
 
-            // Fetch attachment counts in a single query
-            try {
-                const counts = await fetchAttachmentCountsByDeals(data.map(d => d.id))
-                setAttachmentCounts(counts)
-            } catch {
-                setAttachmentCounts({})
-            }
+            const ids = data.map(d => d.id)
+
+            // Fetch attachment counts and stage histories in parallel
+            const [counts, histories] = await Promise.all([
+                fetchAttachmentCountsByDeals(ids).catch(() => ({})),
+                fetchDealStageHistories(ids).catch(() => ({})),
+            ])
+            setAttachmentCounts(counts as AttachmentCounts)
+            setStageHistories(histories)
         } finally {
             setLoading(false)
         }
@@ -193,6 +197,7 @@ export default function PipelinePage() {
                                 stage={stage}
                                 deals={dealsByStage[stage]}
                                 attachmentCounts={attachmentCounts}
+                                stageHistories={stageHistories}
                                 onAddDeal={handleOpenNewDeal}
                                 onStageChange={handleDealStageChange}
                                 onDealDeleted={handleDealDeleted}

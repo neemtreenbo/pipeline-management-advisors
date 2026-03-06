@@ -57,6 +57,8 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     const [valueDraft, setValueDraft] = useState('')
     const [editingTitle, setEditingTitle] = useState(false)
     const [titleDraft, setTitleDraft] = useState('')
+    const [editingDueDate, setEditingDueDate] = useState(false)
+    const [dueDateDraft, setDueDateDraft] = useState('')
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
 
@@ -122,6 +124,14 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
         setDeal((d) => d ? { ...d, data: newData } : d)
         setEditingTitle(false)
         await updateDeal(deal.id, { title: newTitle })
+    }
+
+    async function handleDueDateSave() {
+        if (!deal) return
+        const newDate = dueDateDraft || null
+        setDeal((d) => d ? { ...d, due_date: newDate } : d)
+        setEditingDueDate(false)
+        await updateDeal(deal.id, { due_date: newDate })
     }
 
     function handleAttachmentUploaded(attachment: DealAttachment) {
@@ -367,19 +377,57 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                 </div>
                             </div>
 
-                            {/* Close date */}
-                            {deal.expected_close_date && (
-                                <div className="flex items-center gap-1.5 mt-2">
-                                    <Calendar size={11} className="text-muted-foreground/40 shrink-0" />
-                                    <span className="text-[11px] text-muted-foreground/50">
-                                        {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            year: 'numeric',
-                                        })}
-                                    </span>
-                                </div>
-                            )}
+                            {/* Dates row */}
+                            <div className="flex items-center gap-4 mt-2">
+                                {deal.expected_close_date && (
+                                    <div className="flex items-center gap-1.5">
+                                        <Calendar size={11} className="text-muted-foreground/40 shrink-0" />
+                                        <span className="text-[11px] text-muted-foreground/50">
+                                            {new Date(deal.expected_close_date).toLocaleDateString('en-PH', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                            })}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Due date */}
+                                {editingDueDate ? (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            autoFocus
+                                            type="date"
+                                            className="text-[11px] text-foreground bg-transparent border-0 border-b border-foreground/20 focus:ring-0 outline-none transition-colors"
+                                            value={dueDateDraft}
+                                            onChange={(e) => setDueDateDraft(e.target.value)}
+                                            onBlur={handleDueDateSave}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleDueDateSave()
+                                                if (e.key === 'Escape') setEditingDueDate(false)
+                                            }}
+                                        />
+                                    </div>
+                                ) : deal.due_date ? (
+                                    <button
+                                        onClick={() => { setDueDateDraft(deal.due_date ?? ''); setEditingDueDate(true) }}
+                                        className={`flex items-center gap-1 text-[11px] hover:text-foreground transition-colors ${
+                                            new Date(deal.due_date) < new Date() ? 'text-destructive' : 'text-muted-foreground/50'
+                                        }`}
+                                    >
+                                        <Calendar size={11} className="shrink-0" />
+                                        Due {new Date(deal.due_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => { setDueDateDraft(''); setEditingDueDate(true) }}
+                                        className="flex items-center gap-1 text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                    >
+                                        <Calendar size={11} />
+                                        Set due date
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Tabs */}
