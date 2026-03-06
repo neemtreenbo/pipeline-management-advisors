@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import type { Deal, DealStage } from './deals'
 import { PIPELINE_STAGES } from './deals'
-// Task type available via './tasks' if needed for future overdue-task rules
+import type { Task } from './tasks'
 
 // ─────────────────────────────────────────────
 // Types
@@ -22,13 +22,16 @@ export interface PipelineSnapshot {
 
 export interface ActionItem {
     id: string
-    dealId: string
-    dealTitle: string
-    clientName: string
-    stage: DealStage
+    dealId?: string
+    taskId?: string
+    dealTitle?: string
+    taskTitle?: string
+    clientName?: string
+    stage?: DealStage
     urgency: 'high' | 'medium' | 'low'
     reason: string
     actionLabel: string
+    link: string
 }
 
 export interface Insight {
@@ -51,45 +54,234 @@ export interface ActivityRecord {
 
 // ─────────────────────────────────────────────
 // Tunable Rule Configuration
-//
-// Adjust thresholds here to change how the
-// heuristic engine scores and classifies deals.
 // ─────────────────────────────────────────────
 
-export const RULES = {
-    /** Days without activity before a deal is considered stale */
+export interface RulesConfig {
+    // Deal rules
+    staleDealDays: number
+    earlyStageFollowUpDays: number
+    closingSoonDays: number
+    closingNoProposalDays: number
+    imbalanceThresholdPct: number
+    stalePipelinePct: number
+    revenueConcentrationPct: number
+    earlyStages: DealStage[]
+    lateStages: DealStage[]
+
+    // Task rules
+    taskOverdueDays: number
+    taskDueSoonDays: number
+    taskOverdueHighThreshold: number
+
+    // General
+    activityFeedLimit: number
+    activityLookbackDays: number
+}
+
+const DEFAULT_RULES: RulesConfig = {
+    // Deal rules
     staleDealDays: 14,
-
-    /** Days without activity for early-stage deals (Contacted/Engaged) to trigger follow-up */
     earlyStageFollowUpDays: 5,
-
-    /** Days before close date to flag a deal as "closing soon" */
     closingSoonDays: 30,
-
-    /** Days before close date + no proposal = high urgency */
     closingNoProposalDays: 14,
-
-    /** % of active deals in one stage to flag pipeline imbalance */
     imbalanceThresholdPct: 40,
-
-    /** % of deals with no activity to flag stale pipeline */
     stalePipelinePct: 30,
-
-    /** % of total pipeline value in a single deal to flag concentration risk */
     revenueConcentrationPct: 50,
+    earlyStages: ['Contacted', 'Engaged'],
+    lateStages: ['Schedule To Present', 'Proposal Presented', 'Decision Pending'],
 
-    /** Stages considered "early" for follow-up rules */
-    earlyStages: ['Contacted', 'Engaged'] as DealStage[],
+    // Task rules
+    taskOverdueDays: 0,
+    taskDueSoonDays: 3,
+    taskOverdueHighThreshold: 3,
 
-    /** Stages considered "late" where a proposal is expected */
-    lateStages: ['Schedule To Present', 'Proposal Presented', 'Decision Pending'] as DealStage[],
-
-    /** Recent activity feed default limit */
+    // General
     activityFeedLimit: 20,
-
-    /** Max deal activities to fetch for staleness map (last N days) */
     activityLookbackDays: 60,
 }
+
+const STORAGE_KEY = 'pma-rules-config'
+
+/** Load rules from localStorage, falling back to defaults */
+export function loadRules(): RulesConfig {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (stored) {
+            const parsed = JSON.parse(stored)
+            return { ...DEFAULT_RULES, ...parsed }
+        }
+    } catch {
+        // ignore parse errors
+    }
+    return { ...DEFAULT_RULES }
+}
+
+/** Save rules to localStorage */
+export function saveRules(rules: RulesConfig): void {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rules))
+}
+
+/** Reset rules to defaults */
+export function resetRules(): RulesConfig {
+    localStorage.removeItem(STORAGE_KEY)
+    return { ...DEFAULT_RULES }
+}
+
+/** Get default rules (for comparison) */
+export function getDefaultRules(): RulesConfig {
+    return { ...DEFAULT_RULES }
+}
+
+// Active rules instance — loaded once, updated by the rules page
+export let RULES: RulesConfig = loadRules()
+
+/** Refresh the in-memory rules from localStorage */
+export function refreshRules(): void {
+    RULES = loadRules()
+}
+
+// ─────────────────────────────────────────────
+// Rule Metadata (for the rules UI)
+// ─────────────────────────────────────────────
+
+export interface RuleMeta {
+    key: keyof RulesConfig
+    label: string
+    description: string
+    category: 'deal' | 'task' | 'general'
+    type: 'number' | 'stages'
+    unit?: string
+    min?: number
+    max?: number
+}
+
+export const RULE_DEFINITIONS: RuleMeta[] = [
+    // Deal rules
+    {
+        key: 'staleDealDays',
+        label: 'Stale deal threshold',
+        description: 'Days without activity before a deal is flagged as stale (HIGH urgency)',
+        category: 'deal',
+        type: 'number',
+        unit: 'days',
+        min: 1,
+        max: 90,
+    },
+    {
+        key: 'earlyStageFollowUpDays',
+        label: 'Early-stage follow-up',
+        description: 'Days without activity in early stages before suggesting follow-up (MEDIUM urgency)',
+        category: 'deal',
+        type: 'number',
+        unit: 'days',
+        min: 1,
+        max: 30,
+    },
+    {
+        key: 'closingSoonDays',
+        label: 'Closing soon window',
+        description: 'Days before expected close date to flag a deal as "closing soon"',
+        category: 'deal',
+        type: 'number',
+        unit: 'days',
+        min: 7,
+        max: 90,
+    },
+    {
+        key: 'closingNoProposalDays',
+        label: 'No proposal alert',
+        description: 'Days before close date to trigger HIGH urgency if no proposal is uploaded',
+        category: 'deal',
+        type: 'number',
+        unit: 'days',
+        min: 3,
+        max: 60,
+    },
+    {
+        key: 'imbalanceThresholdPct',
+        label: 'Pipeline imbalance',
+        description: 'Percentage of deals in one stage to flag as imbalanced',
+        category: 'deal',
+        type: 'number',
+        unit: '%',
+        min: 20,
+        max: 80,
+    },
+    {
+        key: 'stalePipelinePct',
+        label: 'Stale pipeline threshold',
+        description: 'Percentage of idle deals to flag the pipeline as stale',
+        category: 'deal',
+        type: 'number',
+        unit: '%',
+        min: 10,
+        max: 80,
+    },
+    {
+        key: 'revenueConcentrationPct',
+        label: 'Revenue concentration',
+        description: 'Percentage of total value in one deal to flag concentration risk',
+        category: 'deal',
+        type: 'number',
+        unit: '%',
+        min: 20,
+        max: 90,
+    },
+
+    // Task rules
+    {
+        key: 'taskOverdueDays',
+        label: 'Overdue task grace period',
+        description: 'Days past due before a task appears as an action item (0 = immediately)',
+        category: 'task',
+        type: 'number',
+        unit: 'days',
+        min: 0,
+        max: 14,
+    },
+    {
+        key: 'taskDueSoonDays',
+        label: 'Due soon window',
+        description: 'Days before a task is due to flag it as "due soon" (MEDIUM urgency)',
+        category: 'task',
+        type: 'number',
+        unit: 'days',
+        min: 1,
+        max: 14,
+    },
+    {
+        key: 'taskOverdueHighThreshold',
+        label: 'Overdue HIGH threshold',
+        description: 'Days overdue to escalate a task from MEDIUM to HIGH urgency',
+        category: 'task',
+        type: 'number',
+        unit: 'days',
+        min: 1,
+        max: 30,
+    },
+
+    // General
+    {
+        key: 'activityFeedLimit',
+        label: 'Activity feed limit',
+        description: 'Number of recent activities to show in the feed',
+        category: 'general',
+        type: 'number',
+        unit: 'items',
+        min: 5,
+        max: 100,
+    },
+    {
+        key: 'activityLookbackDays',
+        label: 'Activity lookback',
+        description: 'How far back to check for deal activity when detecting staleness',
+        category: 'general',
+        type: 'number',
+        unit: 'days',
+        min: 14,
+        max: 365,
+    },
+]
 
 // ─────────────────────────────────────────────
 // Data Fetchers
@@ -130,7 +322,6 @@ export async function fetchDealActivitiesMap(
 
     const map = new Map<string, string>()
     for (const row of data ?? []) {
-        // Only keep the most recent activity per deal
         if (!map.has(row.entity_id)) {
             map.set(row.entity_id, row.created_at!)
         }
@@ -212,7 +403,7 @@ export function computePipelineSnapshot(deals: Deal[]): PipelineSnapshot[] {
 }
 
 // ─────────────────────────────────────────────
-// Heuristic Engine — Action Items
+// Heuristic Engine — Helpers
 // ─────────────────────────────────────────────
 
 function daysSince(dateStr: string): number {
@@ -231,14 +422,21 @@ function dealTitle(deal: Deal): string {
     return (deal.data?.title as string) || deal.client?.name || 'Untitled Deal'
 }
 
-/** Generate ranked action items from pipeline data */
+// ─────────────────────────────────────────────
+// Heuristic Engine — Action Items
+// ─────────────────────────────────────────────
+
+/** Generate ranked action items from pipeline + task data */
 export function generateActionItems(
     deals: Deal[],
     lastActivityMap: Map<string, string>,
-    proposalDealIds: Set<string>
+    proposalDealIds: Set<string>,
+    tasks?: Task[]
 ): ActionItem[] {
     const items: ActionItem[] = []
     const activeDeals = deals.filter((d) => d.stage !== 'Closed')
+
+    // ── Deal-based rules ──
 
     for (const deal of activeDeals) {
         const lastActivity = lastActivityMap.get(deal.id)
@@ -267,6 +465,7 @@ export function generateActionItems(
                 urgency: 'high',
                 reason: `Closing in ${closesIn} day${closesIn !== 1 ? 's' : ''} with no proposal uploaded`,
                 actionLabel: 'Upload proposal',
+                link: `/app/deals/${deal.id}`,
             })
         }
 
@@ -281,9 +480,9 @@ export function generateActionItems(
                 urgency: 'high',
                 reason: `No activity in ${idle} days`,
                 actionLabel: 'Follow up',
+                link: `/app/deals/${deal.id}`,
             })
         } else if (idle === null) {
-            // No recorded activity at all within lookback window
             items.push({
                 id: `${deal.id}-no-activity`,
                 dealId: deal.id,
@@ -293,6 +492,7 @@ export function generateActionItems(
                 urgency: 'high',
                 reason: 'No recorded activity',
                 actionLabel: 'Review deal',
+                link: `/app/deals/${deal.id}`,
             })
         }
 
@@ -312,6 +512,7 @@ export function generateActionItems(
                 urgency: 'medium',
                 reason: `In ${deal.stage} with no activity for ${idle} days`,
                 actionLabel: 'Reach out',
+                link: `/app/deals/${deal.id}`,
             })
         }
 
@@ -330,7 +531,55 @@ export function generateActionItems(
                 urgency: 'medium',
                 reason: `Expected to close in ${closesIn} days`,
                 actionLabel: 'Prepare',
+                link: `/app/deals/${deal.id}`,
             })
+        }
+    }
+
+    // ── Task-based rules ──
+
+    if (tasks) {
+        const now = new Date()
+        const soonCutoff = new Date()
+        soonCutoff.setDate(now.getDate() + RULES.taskDueSoonDays)
+
+        for (const task of tasks) {
+            if (task.status === 'completed') continue
+            if (!task.due_at) continue
+
+            const dueDate = new Date(task.due_at)
+            const overdueDays = daysSince(task.due_at)
+            const dueIn = daysUntil(task.due_at)
+
+            // Overdue tasks
+            if (dueDate < now && overdueDays >= RULES.taskOverdueDays) {
+                const isHigh = overdueDays >= RULES.taskOverdueHighThreshold
+                items.push({
+                    id: `task-${task.id}-overdue`,
+                    taskId: task.id,
+                    taskTitle: task.title,
+                    urgency: isHigh ? 'high' : 'medium',
+                    reason: overdueDays === 0
+                        ? 'Task is due today'
+                        : `Task overdue by ${overdueDays} day${overdueDays !== 1 ? 's' : ''}`,
+                    actionLabel: 'Complete task',
+                    link: '/app/tasks',
+                })
+            }
+            // Due soon (not overdue)
+            else if (dueDate >= now && dueDate <= soonCutoff) {
+                items.push({
+                    id: `task-${task.id}-due-soon`,
+                    taskId: task.id,
+                    taskTitle: task.title,
+                    urgency: 'low',
+                    reason: dueIn === 0
+                        ? 'Due today'
+                        : `Due in ${dueIn} day${dueIn !== 1 ? 's' : ''}`,
+                    actionLabel: 'Review task',
+                    link: '/app/tasks',
+                })
+            }
         }
     }
 
@@ -354,7 +603,7 @@ export function generateInsights(
 
     if (activeDeals.length === 0) return insights
 
-    // 1. Pipeline imbalance — any single stage holding too many deals
+    // 1. Pipeline imbalance
     const stageCounts = new Map<DealStage, number>()
     for (const deal of activeDeals) {
         stageCounts.set(deal.stage, (stageCounts.get(deal.stage) ?? 0) + 1)
@@ -372,7 +621,7 @@ export function generateInsights(
         }
     }
 
-    // 2. Stale pipeline — too many deals with no recent activity
+    // 2. Stale pipeline
     const staleCount = activeDeals.filter((d) => {
         const last = lastActivityMap.get(d.id)
         return !last || daysSince(last) >= RULES.staleDealDays
@@ -388,7 +637,7 @@ export function generateInsights(
         })
     }
 
-    // 3. Revenue concentration — one deal dominates the pipeline
+    // 3. Revenue concentration
     const totalValue = activeDeals.reduce(
         (sum, d) => sum + (d.value ?? 0),
         0
@@ -409,7 +658,7 @@ export function generateInsights(
         }
     }
 
-    // 4. Positive: recently moved deals (activity in last 3 days)
+    // 4. Positive: recently active deals
     const recentlyActive = activeDeals.filter((d) => {
         const last = lastActivityMap.get(d.id)
         return last && daysSince(last) <= 3
@@ -424,7 +673,7 @@ export function generateInsights(
         })
     }
 
-    // 5. Info: early-stage pipeline health
+    // 5. Funnel distribution
     const earlyCount = activeDeals.filter((d) =>
         (['Opportunity', ...RULES.earlyStages] as DealStage[]).includes(d.stage)
     ).length
