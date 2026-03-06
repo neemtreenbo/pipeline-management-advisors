@@ -7,6 +7,7 @@ import {
     CheckCircle,
     Zap,
     Settings2,
+    RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ActionItem } from '@/lib/dashboard'
@@ -20,7 +21,7 @@ const URGENCY_STYLES = {
     },
     medium: {
         dot: 'bg-warning',
-        badge: 'text-amber-700 bg-warning/10',
+        badge: 'text-amber-600 dark:text-amber-400 bg-warning/10',
         label: 'Med',
         icon: <Clock size={12} />,
     },
@@ -87,19 +88,21 @@ interface ActionItemsBarProps {
     items: ActionItem[]
     loading: boolean
     onOpenRules?: () => void
+    onRefresh?: () => void
 }
 
 export default function ActionItemsBar({
     items,
     loading,
     onOpenRules,
+    onRefresh,
 }: ActionItemsBarProps) {
     const highCount = items.filter((i) => i.urgency === 'high').length
     const medCount = items.filter((i) => i.urgency === 'medium').length
 
     if (loading) {
         return (
-            <div className="rounded-xl border border-border bg-white shadow-sm">
+            <div className="rounded-xl border border-border bg-card shadow-sm">
                 <div className="px-4 py-3 border-b border-border">
                     <div className="h-4 w-32 bg-muted rounded animate-pulse" />
                 </div>
@@ -119,7 +122,7 @@ export default function ActionItemsBar({
     }
 
     return (
-        <div className="rounded-xl border border-border bg-white shadow-sm">
+        <div className="rounded-xl border border-border bg-card shadow-sm">
             {/* Header */}
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -138,20 +141,38 @@ export default function ActionItemsBar({
                         </span>
                     )}
                     {medCount > 0 && (
-                        <span className="text-[10px] font-medium text-amber-700 bg-warning/10 rounded px-1.5 py-0.5">
+                        <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-warning/10 rounded px-1.5 py-0.5">
                             {medCount} attention
                         </span>
                     )}
                 </div>
-                {onOpenRules && (
-                    <button
-                        onClick={onOpenRules}
-                        className="p-1 rounded-md hover:bg-muted transition-colors duration-150"
-                        title="Configure rules"
-                    >
-                        <Settings2 size={14} className="text-muted-foreground" />
-                    </button>
-                )}
+                <div className="flex items-center gap-1">
+                    {onRefresh && (
+                        <button
+                            onClick={onRefresh}
+                            disabled={loading}
+                            className="p-1 rounded-md hover:bg-muted transition-colors duration-150"
+                            title="Refresh"
+                        >
+                            <RefreshCw
+                                size={14}
+                                className={cn(
+                                    'text-muted-foreground',
+                                    loading && 'animate-spin'
+                                )}
+                            />
+                        </button>
+                    )}
+                    {onOpenRules && (
+                        <button
+                            onClick={onOpenRules}
+                            className="p-1 rounded-md hover:bg-muted transition-colors duration-150"
+                            title="Configure rules"
+                        >
+                            <Settings2 size={14} className="text-muted-foreground" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Items */}

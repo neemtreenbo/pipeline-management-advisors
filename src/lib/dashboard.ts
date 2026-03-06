@@ -60,13 +60,7 @@ export interface RulesConfig {
     // Deal rules
     staleDealDays: number
     earlyStageFollowUpDays: number
-    closingSoonDays: number
-    closingNoProposalDays: number
-    imbalanceThresholdPct: number
-    stalePipelinePct: number
-    revenueConcentrationPct: number
     earlyStages: DealStage[]
-    lateStages: DealStage[]
 
     // Task rules
     taskOverdueDays: number
@@ -82,13 +76,7 @@ const DEFAULT_RULES: RulesConfig = {
     // Deal rules
     staleDealDays: 14,
     earlyStageFollowUpDays: 5,
-    closingSoonDays: 30,
-    closingNoProposalDays: 14,
-    imbalanceThresholdPct: 40,
-    stalePipelinePct: 30,
-    revenueConcentrationPct: 50,
     earlyStages: ['Contacted', 'Engaged'],
-    lateStages: ['Schedule To Present', 'Proposal Presented', 'Decision Pending'],
 
     // Task rules
     taskOverdueDays: 0,
@@ -177,57 +165,6 @@ export const RULE_DEFINITIONS: RuleMeta[] = [
         min: 1,
         max: 30,
     },
-    {
-        key: 'closingSoonDays',
-        label: 'Closing soon window',
-        description: 'Days before expected close date to flag a deal as "closing soon"',
-        category: 'deal',
-        type: 'number',
-        unit: 'days',
-        min: 7,
-        max: 90,
-    },
-    {
-        key: 'closingNoProposalDays',
-        label: 'No proposal alert',
-        description: 'Days before close date to trigger HIGH urgency if no proposal is uploaded',
-        category: 'deal',
-        type: 'number',
-        unit: 'days',
-        min: 3,
-        max: 60,
-    },
-    {
-        key: 'imbalanceThresholdPct',
-        label: 'Pipeline imbalance',
-        description: 'Percentage of deals in one stage to flag as imbalanced',
-        category: 'deal',
-        type: 'number',
-        unit: '%',
-        min: 20,
-        max: 80,
-    },
-    {
-        key: 'stalePipelinePct',
-        label: 'Stale pipeline threshold',
-        description: 'Percentage of idle deals to flag the pipeline as stale',
-        category: 'deal',
-        type: 'number',
-        unit: '%',
-        min: 10,
-        max: 80,
-    },
-    {
-        key: 'revenueConcentrationPct',
-        label: 'Revenue concentration',
-        description: 'Percentage of total value in one deal to flag concentration risk',
-        category: 'deal',
-        type: 'number',
-        unit: '%',
-        min: 20,
-        max: 90,
-    },
-
     // Task rules
     {
         key: 'taskOverdueDays',
@@ -430,7 +367,6 @@ function dealTitle(deal: Deal): string {
 export function generateActionItems(
     deals: Deal[],
     lastActivityMap: Map<string, string>,
-    proposalDealIds: Set<string>,
     tasks?: Task[]
 ): ActionItem[] {
     const items: ActionItem[] = []
@@ -441,33 +377,8 @@ export function generateActionItems(
     for (const deal of activeDeals) {
         const lastActivity = lastActivityMap.get(deal.id)
         const idle = lastActivity ? daysSince(lastActivity) : null
-        const closesIn = deal.expected_close_date
-            ? daysUntil(deal.expected_close_date)
-            : null
-        const hasProposal = proposalDealIds.has(deal.id)
         const title = dealTitle(deal)
         const client = deal.client?.name ?? 'Unknown'
-
-        // HIGH: Closing soon with no proposal
-        if (
-            closesIn !== null &&
-            closesIn <= RULES.closingNoProposalDays &&
-            closesIn >= 0 &&
-            !hasProposal &&
-            RULES.lateStages.includes(deal.stage)
-        ) {
-            items.push({
-                id: `${deal.id}-no-proposal`,
-                dealId: deal.id,
-                dealTitle: title,
-                clientName: client,
-                stage: deal.stage,
-                urgency: 'high',
-                reason: `Closing in ${closesIn} day${closesIn !== 1 ? 's' : ''} with no proposal uploaded`,
-                actionLabel: 'Upload proposal',
-                link: `/app/deals/${deal.id}`,
-            })
-        }
 
         // HIGH: Stale deal — no activity in staleDealDays+
         if (idle !== null && idle >= RULES.staleDealDays) {
@@ -480,7 +391,7 @@ export function generateActionItems(
                 urgency: 'high',
                 reason: `No activity in ${idle} days`,
                 actionLabel: 'Follow up',
-                link: `/app/deals/${deal.id}`,
+                link: `/app/pipeline?deal=${deal.id}`,
             })
         } else if (idle === null) {
             items.push({
@@ -492,7 +403,7 @@ export function generateActionItems(
                 urgency: 'high',
                 reason: 'No recorded activity',
                 actionLabel: 'Review deal',
-                link: `/app/deals/${deal.id}`,
+                link: `/app/pipeline?deal=${deal.id}`,
             })
         }
 
@@ -512,26 +423,7 @@ export function generateActionItems(
                 urgency: 'medium',
                 reason: `In ${deal.stage} with no activity for ${idle} days`,
                 actionLabel: 'Reach out',
-                link: `/app/deals/${deal.id}`,
-            })
-        }
-
-        // MEDIUM: Closing within closingSoonDays (general)
-        if (
-            closesIn !== null &&
-            closesIn > RULES.closingNoProposalDays &&
-            closesIn <= RULES.closingSoonDays
-        ) {
-            items.push({
-                id: `${deal.id}-closing-soon`,
-                dealId: deal.id,
-                dealTitle: title,
-                clientName: client,
-                stage: deal.stage,
-                urgency: 'medium',
-                reason: `Expected to close in ${closesIn} days`,
-                actionLabel: 'Prepare',
-                link: `/app/deals/${deal.id}`,
+                link: `/app/pipeline?deal=${deal.id}`,
             })
         }
     }

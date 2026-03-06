@@ -6,7 +6,6 @@ import { getTasks } from '@/lib/tasks'
 import {
     fetchRecentActivities,
     fetchDealActivitiesMap,
-    getProposalStatusForDeals,
     generateActionItems,
     refreshRules,
     type ActionItem,
@@ -17,6 +16,7 @@ interface DashboardData {
     actionItems: ActionItem[]
     recentActivities: ActivityRecord[]
     loading: boolean
+    refresh: () => void
 }
 
 export function useDashboardData(): DashboardData {
@@ -71,17 +71,10 @@ export function useDashboardData(): DashboardData {
 
             setRecentActivities(activities)
 
-            // Batch proposal check for active deals
-            const activeDealIds = deals
-                .filter((d) => d.stage !== 'Closed')
-                .map((d) => d.id)
-            const proposalSet = await getProposalStatusForDeals(activeDealIds)
-
             // Generate action items with deal + task rules
             const items = generateActionItems(
                 deals,
                 activityMap,
-                proposalSet,
                 tasks
             )
             setActionItems(items)
@@ -96,5 +89,5 @@ export function useDashboardData(): DashboardData {
         loadData()
     }, [loadData])
 
-    return { actionItems, recentActivities, loading }
+    return { actionItems, recentActivities, loading, refresh: loadData }
 }

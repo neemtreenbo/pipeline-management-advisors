@@ -5,7 +5,7 @@ import ActionItemsBar from '@/components/dashboard/ActionItemsBar'
 
 export default function HomePage() {
     const navigate = useNavigate()
-    const { actionItems, loading } = useDashboardData()
+    const { actionItems, loading, refresh } = useDashboardData()
 
     return (
         <div className="min-h-screen bg-transparent">
@@ -16,6 +16,7 @@ export default function HomePage() {
                         items={actionItems}
                         loading={loading}
                         onOpenRules={() => navigate('/app/settings/rules')}
+                        onRefresh={refresh}
                     />
                 </div>
 
