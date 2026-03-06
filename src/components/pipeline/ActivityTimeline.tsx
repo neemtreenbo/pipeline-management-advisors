@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Activity } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { ACCENT_PALETTE, getAccentBg } from '@/lib/colors'
 
 export interface ActivityRecord {
     id: string
@@ -96,14 +98,22 @@ function formatAbsolute(dateStr: string): string {
     })
 }
 
-function getDotStyle(eventType: string): string {
-    if (eventType === 'task_completed') return 'bg-foreground/50'
-    if (eventType === 'deal_stage_changed') return 'bg-foreground/70'
-    if (eventType === 'proposal_uploaded') return 'bg-foreground/60'
-    return 'bg-border'
+const EVENT_DOT_COLORS: Record<string, typeof ACCENT_PALETTE[keyof typeof ACCENT_PALETTE]> = {
+    deal_created:       ACCENT_PALETTE.blue,
+    deal_stage_changed: ACCENT_PALETTE.purple,
+    proposal_uploaded:  ACCENT_PALETTE.orange,
+    note_created:       ACCENT_PALETTE.gold,
+    note_linked:        ACCENT_PALETTE.gold,
+    note_edited:        ACCENT_PALETTE.gold,
+    task_created:       ACCENT_PALETTE.teal,
+    task_completed:     ACCENT_PALETTE.green,
+    task_uncompleted:   ACCENT_PALETTE.cyan,
 }
 
 export default function ActivityTimeline({ activities, contextDeals }: ActivityTimelineProps) {
+    const { theme } = useTheme()
+    const isDark = theme === 'dark'
+
     if (activities.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
@@ -125,7 +135,14 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                     <div key={activity.id} className="flex gap-3">
                         {/* Dot + line */}
                         <div className="flex flex-col items-center pt-[5px]">
-                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getDotStyle(activity.event_type)}`} />
+                            <div
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{
+                                    backgroundColor: EVENT_DOT_COLORS[activity.event_type]
+                                        ? getAccentBg(EVENT_DOT_COLORS[activity.event_type], isDark)
+                                        : 'hsl(var(--border))',
+                                }}
+                            />
                             {!isLast && <div className="w-px flex-1 bg-border/50 mt-2 mb-1" />}
                         </div>
 

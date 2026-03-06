@@ -76,7 +76,7 @@ export function useCreateClient(orgId: string) {
       return data
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.clients.all(orgId) })
+      qc.invalidateQueries({ queryKey: queryKeys.clients.list(orgId) })
     },
   })
 }

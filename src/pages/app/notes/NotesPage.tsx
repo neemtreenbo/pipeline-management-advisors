@@ -3,19 +3,34 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import { ACCENT_PALETTE, getAccentBg } from '@/lib/colors'
 import { createNote } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
 import { useNotesPaginated, useNoteClientInfo } from '@/hooks/queries/useNotes'
 import { extractTextFromContent } from '@/lib/extract-text'
 import { Button } from '@/components/ui/button'
 
+const PALETTE_CYCLE = [
+    ACCENT_PALETTE.blue,
+    ACCENT_PALETTE.green,
+    ACCENT_PALETTE.purple,
+    ACCENT_PALETTE.orange,
+    ACCENT_PALETTE.teal,
+    ACCENT_PALETTE.gold,
+    ACCENT_PALETTE.cyan,
+]
+
 function getInitials(name: string) {
     if (!name) return '?'
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes, defaultExpanded = false }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[], defaultExpanded?: boolean }) {
+const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes, defaultExpanded = false, colorIndex = 0 }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[], defaultExpanded?: boolean, colorIndex?: number }) {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+    const { theme } = useTheme()
+    const isDark = theme === 'dark'
+    const accentColor = PALETTE_CYCLE[colorIndex % PALETTE_CYCLE.length]
 
     return (
         <div className="mb-8 last:mb-0">
@@ -35,7 +50,10 @@ const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, pr
                         )
                     )}
                     <h2 className="text-lg font-semibold text-foreground">{clientName}</h2>
-                    <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{notes.length}</span>
+                    <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full text-white/90"
+                        style={{ backgroundColor: getAccentBg(accentColor, isDark) }}
+                    >{notes.length}</span>
                 </div>
             </button>
 
@@ -174,7 +192,7 @@ export default function NotesPage() {
                     ) : (
                         <div className="flex flex-col">
                             {sortedGroups.map((group, i) => (
-                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0} />
+                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0} colorIndex={i} />
                             ))}
 
                             {hasMore && (

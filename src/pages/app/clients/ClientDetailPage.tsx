@@ -9,6 +9,8 @@ import { useClientDetail, type ClientListItem } from '@/hooks/queries/useClients
 import { useDealsByClient } from '@/hooks/queries/useDeals'
 import { queryKeys } from '@/lib/queryKeys'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
+import { useTheme } from '@/contexts/ThemeContext'
+import { SOURCE_COLORS, getAccentBg } from '@/lib/colors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,17 +19,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
-
-const SOURCE_COLORS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
-    referral: 'success',
-    walk_in: 'accent',
-    social_media: 'warning',
-}
-
-function getSourceVariant(source: string | null) {
-    if (!source) return 'muted' as const
-    return SOURCE_COLORS[source] ?? 'muted'
-}
 
 function formatSource(src: string | null) {
     if (!src) return '—'
@@ -61,6 +52,8 @@ function InfoRow({ label, value, showEmpty = false }: { label: string; value: st
 export default function ClientDetailPage() {
     const { clientId } = useParams<{ clientId: string }>()
     const navigate = useNavigate()
+    const { theme } = useTheme()
+    const isDark = theme === 'dark'
 
     const qc = useQueryClient()
     const { data: client = null, isLoading: clientLoading, isError: notFound } = useClientDetail(clientId)
@@ -401,9 +394,16 @@ export default function ClientDetailPage() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <h1 className="text-2xl font-semibold text-foreground">{client.name}</h1>
                                             {client.source && (
-                                                <Badge variant={getSourceVariant(client.source)} className="capitalize">
+                                                <span
+                                                    className="inline-flex items-center justify-center min-w-[5.5rem] px-2.5 py-0.5 rounded-full text-xs font-medium capitalize text-white/90"
+                                                    style={{
+                                                        backgroundColor: SOURCE_COLORS[client.source]
+                                                            ? getAccentBg(SOURCE_COLORS[client.source], isDark)
+                                                            : undefined,
+                                                    }}
+                                                >
                                                     {formatSource(client.source)}
-                                                </Badge>
+                                                </span>
                                             )}
                                             <Button
                                                 size="icon"

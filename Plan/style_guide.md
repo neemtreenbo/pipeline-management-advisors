@@ -252,7 +252,67 @@ thick highlights
 
 ---
 
-# 8. Kanban Board Style
+# 8. Accent Color Palette
+
+A shared set of seven muted accent colors used across pipeline stages,
+client source badges, and any future color-coded UI.
+
+Defined in `src/lib/colors.ts` — always import from there.
+
+| Name   | Light HSL              | Dark HSL               |
+|--------|------------------------|------------------------|
+| Blue   | hsl(210, 60%, 72%)     | hsl(210, 50%, 45%)     |
+| Cyan   | hsl(185, 50%, 62%)     | hsl(185, 40%, 40%)     |
+| Teal   | hsl(160, 45%, 58%)     | hsl(160, 35%, 38%)     |
+| Gold   | hsl(45, 65%, 62%)      | hsl(45, 50%, 42%)      |
+| Orange | hsl(28, 60%, 62%)      | hsl(28, 45%, 42%)      |
+| Purple | hsl(280, 40%, 65%)     | hsl(280, 30%, 42%)     |
+| Green  | hsl(142, 45%, 55%)     | hsl(142, 35%, 38%)     |
+
+Pipeline stage mapping:
+
+Opportunity → Blue
+Contacted → Cyan
+Engaged → Teal
+Schedule To Present → Gold
+Proposal Presented → Orange
+Decision Pending → Purple
+Closed → Green
+
+Client source mapping:
+
+Referral → Green
+Family → Teal
+Friends → Cyan
+Social Media → Purple
+Website → Orange
+Cold Call → Gold
+Event → Gold
+Other → Cyan
+
+Usage:
+
+```ts
+import { ACCENT_PALETTE, getAccentBg, STAGE_COLORS, SOURCE_COLORS } from '@/lib/colors'
+
+// Resolve theme-aware color
+const bg = getAccentBg(ACCENT_PALETTE.blue, isDark)
+
+// Domain-specific
+const stageBg = getAccentBg(STAGE_COLORS['Opportunity'], isDark)
+const sourceBg = getAccentBg(SOURCE_COLORS['referral'], isDark)
+```
+
+Applied via inline `style={{ backgroundColor }}` with `text-white/90` for text.
+
+Rules:
+
+Never hardcode HSL accent values in components — use the palette.
+When adding a new domain color map, reference `ACCENT_PALETTE` entries.
+
+---
+
+# 9. Kanban Board Style
 
 Pipeline cards
 
@@ -275,7 +335,7 @@ scale 1.02
 
 ---
 
-# 9. Notes Editor
+# 10. Notes Editor
 
 Notes should feel like a clean document.
 
@@ -289,7 +349,7 @@ Focus mode preferred.
 
 ---
 
-# 10. Visual Philosophy
+# 11. Visual Philosophy
 
 Less UI  
 More Content
@@ -304,7 +364,7 @@ Remove anything unnecessary.
 
 ---
 
-# 11. Things to Avoid
+# 12. Things to Avoid
 
 too many colors  
 heavy gradients  
@@ -316,7 +376,7 @@ Minimalism requires discipline.
 
 ---
 
-# 12. Recommended Layout for This App
+# 13. Recommended Layout for This App
 
 Sidebar
 
