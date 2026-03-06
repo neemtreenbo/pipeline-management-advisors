@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import {
     PIPELINE_STAGES,
-    fetchDealsByOrg,
     createDeal,
     updateDealStage,
     logDealActivity,
-    fetchDealStageHistories,
 } from '@/lib/deals'
-import type { Deal, DealStage, NewDealInput, StageTransition } from '@/lib/deals'
-import { fetchAttachmentCountsByDeals } from '@/lib/attachments'
+import type { Deal, DealStage, NewDealInput } from '@/lib/deals'
+import { useDeals, useDealAttachmentCounts, useDealStageHistories } from '@/hooks/queries/useDeals'
+import { queryKeys } from '@/lib/queryKeys'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
 
 interface AttachmentCounts {
@@ -24,39 +24,17 @@ export default function PipelinePage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
     const navigate = useNavigate()
+    const qc = useQueryClient()
     const [searchParams] = useSearchParams()
     const dealIdFromSearch = searchParams.get('deal')
-    const [deals, setDeals] = useState<Deal[]>([])
-    const [attachmentCounts, setAttachmentCounts] = useState<AttachmentCounts>({})
-    const [stageHistories, setStageHistories] = useState<Record<string, StageTransition[]>>({})
-    const [loading, setLoading] = useState(true)
+
+    const { data: deals = [], isLoading: loading } = useDeals(orgId ?? undefined)
+    const dealIds = useMemo(() => deals.map(d => d.id), [deals])
+    const { data: attachmentCounts = {} } = useDealAttachmentCounts(orgId ?? undefined, dealIds)
+    const { data: stageHistories = {} } = useDealStageHistories(orgId ?? undefined, dealIds)
+
     const dealsRef = useRef(deals)
     dealsRef.current = deals
-
-    const loadDeals = useCallback(async () => {
-        if (!orgId) return
-        setLoading(true)
-        try {
-            const data = await fetchDealsByOrg(orgId)
-            setDeals(data)
-
-            const ids = data.map(d => d.id)
-
-            // Fetch attachment counts and stage histories in parallel
-            const [counts, histories] = await Promise.all([
-                fetchAttachmentCountsByDeals(ids).catch(() => ({})),
-                fetchDealStageHistories(ids).catch(() => ({})),
-            ])
-            setAttachmentCounts(counts as AttachmentCounts)
-            setStageHistories(histories)
-        } finally {
-            setLoading(false)
-        }
-    }, [orgId])
-
-    useEffect(() => {
-        loadDeals()
-    }, [loadDeals])
 
     const dealsByStage = useMemo(() => {
         const grouped: Record<DealStage, Deal[]> = PIPELINE_STAGES.reduce(
@@ -125,10 +103,11 @@ export default function PipelinePage() {
             }
         }
 
+        const dealsKey = queryKeys.deals.all(orgId)
         const targetDealIdx = updatedDeals.findIndex(d => d.id === dealToMove.id)
         if (targetDealIdx !== -1) {
             updatedDeals[targetDealIdx] = { ...dealToMove, stage: toStage, order_index: newOrderIndex }
-            setDeals(updatedDeals)
+            qc.setQueryData<Deal[]>(dealsKey, updatedDeals)
         }
 
         try {
@@ -141,7 +120,7 @@ export default function PipelinePage() {
             }
         } catch (err: unknown) {
             console.error('Failed to update stage/position', err)
-            setDeals(snapshotDeals)
+            qc.setQueryData<Deal[]>(dealsKey, snapshotDeals)
         }
     }
 
@@ -153,20 +132,22 @@ export default function PipelinePage() {
                 stage: deal.stage,
                 title: input.title,
             })
-            setDeals((prev) => [deal, ...prev])
-            setAttachmentCounts((prev) => ({ ...prev, [deal.id]: { proposal: 0, total: 0 } }))
+            qc.setQueryData<Deal[]>(queryKeys.deals.all(orgId), (prev) => prev ? [deal, ...prev] : [deal])
+            qc.setQueryData<AttachmentCounts>(queryKeys.deals.attachmentCounts(orgId), (prev) => ({ ...prev, [deal.id]: { proposal: 0, total: 0 } }))
         } catch (err: unknown) {
             console.error('Failed to create deal:', err)
         }
-    }, [user, orgId])
+    }, [user, orgId, qc])
 
     const handleDealStageChange = useCallback((dealId: string, newStage: DealStage) => {
-        setDeals((prev) => prev.map((d) => d.id === dealId ? { ...d, stage: newStage } : d))
-    }, [])
+        if (!orgId) return
+        qc.setQueryData<Deal[]>(queryKeys.deals.all(orgId), (prev) => prev?.map((d) => d.id === dealId ? { ...d, stage: newStage } : d))
+    }, [orgId, qc])
 
     const handleDealDeleted = useCallback((dealId: string) => {
-        setDeals((prev) => prev.filter((d) => d.id !== dealId))
-    }, [])
+        if (!orgId) return
+        qc.setQueryData<Deal[]>(queryKeys.deals.all(orgId), (prev) => prev?.filter((d) => d.id !== dealId))
+    }, [orgId, qc])
 
 
     return (

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Users, Kanban, CheckSquare, StickyNote, X } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/contexts/OrgContext'
+import { useGlobalSearch } from '@/hooks/queries/useSearch'
 
 interface SearchResult {
     id: string
@@ -22,62 +22,18 @@ export default function GlobalSearch() {
     const { orgId } = useOrg()
     const navigate = useNavigate()
     const [query, setQuery] = useState('')
-    const [results, setResults] = useState<SearchResult[]>([])
+    const [debouncedQuery, setDebouncedQuery] = useState('')
     const [open, setOpen] = useState(false)
-    const [loading, setLoading] = useState(false)
     const [activeIndex, setActiveIndex] = useState(0)
     const inputRef = useRef<HTMLInputElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    const search = useCallback(async (q: string) => {
-        if (!orgId || q.trim().length < 2) {
-            setResults([])
-            return
-        }
-        setLoading(true)
-        const term = `%${q.trim()}%`
-
-        const [clients, deals, tasks, notes] = await Promise.all([
-            supabase.from('clients').select('id, name, job_title').eq('org_id', orgId).ilike('name', term).limit(3),
-            supabase.from('deals').select('id, data, client:clients(name)').eq('org_id', orgId).ilike('data->>title', term).limit(3),
-            supabase.from('tasks').select('id, title, status').eq('org_id', orgId).ilike('title', term).limit(3),
-            supabase.from('notes').select('id, title').eq('org_id', orgId).ilike('title', term).limit(3),
-        ])
-
-        const compiled: SearchResult[] = [
-            ...(clients.data ?? []).map(c => ({
-                id: c.id,
-                type: 'client' as const,
-                title: c.name,
-                subtitle: c.job_title ?? undefined,
-            })),
-            ...(deals.data ?? []).map((d: any) => ({
-                id: d.id,
-                type: 'deal' as const,
-                title: (d.data as Record<string, string>)?.title ?? 'Untitled Deal',
-                subtitle: d.client?.name ?? undefined,
-            })),
-            ...(tasks.data ?? []).map(t => ({
-                id: t.id,
-                type: 'task' as const,
-                title: t.title ?? 'Untitled Task',
-                subtitle: t.status ?? undefined,
-            })),
-            ...(notes.data ?? []).map(n => ({
-                id: n.id,
-                type: 'note' as const,
-                title: n.title ?? 'Untitled Note',
-            })),
-        ]
-
-        setResults(compiled)
-        setLoading(false)
-    }, [orgId])
+    const { data: results = [], isLoading: loading } = useGlobalSearch(orgId ?? undefined, debouncedQuery)
 
     useEffect(() => {
-        const timer = setTimeout(() => search(query), 200)
+        const timer = setTimeout(() => setDebouncedQuery(query), 200)
         return () => clearTimeout(timer)
-    }, [query, search])
+    }, [query])
 
     useEffect(() => {
         setActiveIndex(0)
@@ -127,7 +83,7 @@ export default function GlobalSearch() {
                 />
                 {query && (
                     <button
-                        onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus() }}
+                        onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus() }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                         <X size={11} />

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
+import { useClients, useCreateClient, useUpdateClient } from '@/hooks/queries/useClients'
 import { Button } from '@/components/ui/button'
 
 type SortField = 'name' | 'source' | 'email' | 'phone'
@@ -14,7 +14,7 @@ interface Client {
     email: string | null
     phone: string | null
     source: string | null
-    tags: string[]
+    tags: string[] | null
     created_at: string
     owner_id: string
     org_id: string
@@ -138,39 +138,22 @@ export default function ClientsPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
     const navigate = useNavigate()
-const [clients, setClients] = useState<Client[]>([])
-    const [loading, setLoading] = useState(true)
+    const { data: clients = [], isLoading: loading } = useClients(orgId ?? undefined)
+    const createClientMutation = useCreateClient(orgId ?? '')
+    const updateClientMutation = useUpdateClient()
 
     // Inline edit state (existing rows)
     const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null)
-    const [inlineSaving, setInlineSaving] = useState(false)
     const inlineInputRef = useRef<HTMLInputElement>(null)
 
     // New inline row state
     const [addingNew, setAddingNew] = useState(false)
     const [newRow, setNewRow] = useState({ name: '', email: '', phone: '', source: '' })
-    const [newRowSaving, setNewRowSaving] = useState(false)
     const newNameRef = useRef<HTMLInputElement>(null)
 
     // Sort state
     const [sortField, setSortField] = useState<SortField>('name')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-
-    const fetchClients = useCallback(async () => {
-        if (!orgId) return
-        setLoading(true)
-        const { data } = await supabase
-            .from('clients')
-            .select('*')
-            .eq('org_id', orgId)
-            .order('name', { ascending: true })
-        setClients(data ?? [])
-        setLoading(false)
-    }, [orgId])
-
-    useEffect(() => {
-        fetchClients()
-    }, [fetchClients])
 
     // Focus name field when new row opens
     useEffect(() => {
@@ -190,25 +173,22 @@ const [clients, setClients] = useState<Client[]>([])
     }
 
     async function saveNewRow() {
-        if (!orgId || !user || !newRow.name.trim() || newRowSaving) return
-        setNewRowSaving(true)
+        if (!orgId || !user || !newRow.name.trim() || createClientMutation.isPending) return
 
-        const { error } = await supabase.from('clients').insert({
-            org_id: orgId,
-            owner_id: user.id,
-            name: newRow.name.trim(),
-            email: newRow.email.trim() || null,
-            phone: newRow.phone.trim() || null,
-            source: newRow.source || null,
-            tags: [],
-        })
-
-        if (!error) {
+        try {
+            await createClientMutation.mutateAsync({
+                owner_id: user.id,
+                name: newRow.name.trim(),
+                email: newRow.email.trim() || undefined,
+                phone: newRow.phone.trim() || undefined,
+                source: newRow.source || undefined,
+                tags: [],
+            })
             setAddingNew(false)
             setNewRow({ name: '', email: '', phone: '', source: '' })
-            fetchClients()
+        } catch {
+            // error handled by mutation
         }
-        setNewRowSaving(false)
     }
 
     useEffect(() => {
@@ -218,25 +198,20 @@ const [clients, setClients] = useState<Client[]>([])
     }, [inlineEdit])
 
     async function saveInlineEdit() {
-        if (!inlineEdit || inlineSaving) return
-        setInlineSaving(true)
+        if (!inlineEdit || updateClientMutation.isPending) return
 
         const { id, field, value } = inlineEdit
-        const patch: Record<string, string | null> = { [field]: value.trim() || null }
         if (field === 'name' && !value.trim()) {
             setInlineEdit(null)
-            setInlineSaving(false)
             return
         }
 
-        const { error } = await supabase.from('clients').update(patch).eq('id', id)
-        if (!error) {
-            setClients(prev => prev.map(c =>
-                c.id === id ? { ...c, [field]: value.trim() || null } : c
-            ))
-        }
         setInlineEdit(null)
-        setInlineSaving(false)
+        try {
+            await updateClientMutation.mutateAsync({ id, [field]: value.trim() || null })
+        } catch {
+            // error handled by mutation
+        }
     }
 
     function startEdit(client: Client, field: InlineEdit['field']) {
@@ -416,7 +391,7 @@ const [clients, setClients] = useState<Client[]>([])
                                     <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={saveNewRow}
-                                            disabled={!newRow.name.trim() || newRowSaving}
+                                            disabled={!newRow.name.trim() || createClientMutation.isPending}
                                             className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors duration-150 disabled:opacity-25 disabled:cursor-not-allowed"
                                         >
                                             <Check size={12} strokeWidth={2.5} />

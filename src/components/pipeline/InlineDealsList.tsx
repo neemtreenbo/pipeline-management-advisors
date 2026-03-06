@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef, memo, useCallback } from 'react'
+import { useState, useRef, memo, useCallback } from 'react'
 import { Plus, ChevronRight } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import {
     PIPELINE_STAGES,
-    fetchDealsByClient,
     createDeal,
     logDealActivity,
 } from '@/lib/deals'
 import type { Deal, DealStage } from '@/lib/deals'
+import { useDealsByClient } from '@/hooks/queries/useDeals'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatCurrency } from '@/lib/format'
 import { getDealIcon } from './DealIcon'
 import DealDetailsModal from './DealDetailsModal'
@@ -53,8 +55,9 @@ const DealItem = memo(function DealItem({ deal, onSelect }: { deal: Deal; onSele
 
 export default function InlineDealsList({ clientId, orgId }: InlineDealsListProps) {
     const { user } = useAuth()
-    const [deals, setDeals] = useState<Deal[]>([])
-    const [loading, setLoading] = useState(true)
+    const qc = useQueryClient()
+    const { data: deals = [], isLoading: loading } = useDealsByClient(clientId)
+    const dealsKey = queryKeys.deals.byClient(clientId)
     const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
 
     // Inline add state
@@ -63,21 +66,6 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
     const [stage, setStage] = useState<DealStage>('Opportunity')
     const [saving, setSaving] = useState(false)
     const titleRef = useRef<HTMLInputElement>(null)
-
-    useEffect(() => {
-        loadDeals()
-    }, [clientId])
-
-    async function loadDeals() {
-        setLoading(true)
-        try {
-            setDeals(await fetchDealsByClient(clientId))
-        } catch (err) {
-            console.error('Failed to load deals', err)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     function openAdd() {
         setTitle('')
@@ -100,7 +88,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
                 title: title.trim(),
             })
             await logDealActivity(orgId, user.id, deal.id, 'deal_created', { stage, title: title.trim() })
-            setDeals(prev => [deal, ...prev])
+            qc.setQueryData<Deal[]>(dealsKey, prev => prev ? [deal, ...prev] : [deal])
             setAdding(false)
             setTitle('')
         } catch (err) {
@@ -208,7 +196,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
             {selectedDealId && (
                 <DealDetailsModal
                     dealId={selectedDealId}
-                    onClose={() => { setSelectedDealId(null); loadDeals() }}
+                    onClose={() => { setSelectedDealId(null); qc.invalidateQueries({ queryKey: dealsKey }) }}
                 />
             )}
         </>

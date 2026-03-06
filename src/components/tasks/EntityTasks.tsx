@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { Plus } from 'lucide-react'
-import { getTasks, createTask, updateTask } from '@/lib/tasks'
+import { useQueryClient } from '@tanstack/react-query'
+import { createTask, updateTask } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
 import { todayString, toISO } from '@/lib/date-utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { useEntityTasks } from '@/hooks/queries/useTasks'
+import { queryKeys } from '@/lib/queryKeys'
 import TaskList from './TaskList'
 import TaskDialog from './TaskDialog'
 
@@ -27,8 +30,20 @@ interface EntityTasksProps {
 
 export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActivityAdded }: EntityTasksProps) {
     const { user } = useAuth()
-    const [tasks, setTasks] = useState<Task[]>([])
-    const [loading, setLoading] = useState(true)
+    const qc = useQueryClient()
+    const entityType = clientId ? 'client' : 'deal'
+    const entityId = clientId || dealId
+    const { data: rawTasks = [], isLoading: loading } = useEntityTasks(orgId, entityType, entityId)
+    const tasksKey = queryKeys.tasks.byEntity(entityType, entityId!)
+
+    const tasks = useMemo(() => {
+        return [...rawTasks].sort((a, b) => {
+            if (a.status === 'completed' && b.status !== 'completed') return 1
+            if (a.status !== 'completed' && b.status === 'completed') return -1
+            if (a.due_at && b.due_at) return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+            return 0
+        })
+    }, [rawTasks])
 
     // Inline add state
     const [adding, setAdding] = useState(false)
@@ -44,57 +59,15 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
     const [taskToEdit, setTaskToEdit] = useState<Task | undefined>()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-    const sortTasks = useCallback((data: Task[]) => {
-        return [...data].sort((a, b) => {
-            if (a.status === 'completed' && b.status !== 'completed') return 1
-            if (a.status !== 'completed' && b.status === 'completed') return -1
-            if (a.due_at && b.due_at) return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
-            return 0
-        })
-    }, [])
-
-    const loadTasks = useCallback(async () => {
-        setLoading(true)
-        try {
-            const data = await getTasks({ orgId, clientId, dealId, view: 'all' })
-            setTasks(sortTasks(data))
-        } catch (err) {
-            console.error('Failed to load entity tasks', err)
-        } finally {
-            setLoading(false)
-        }
-    }, [orgId, clientId, dealId, sortTasks])
-
-    useEffect(() => {
-        if (!orgId) return
-        let cancelled = false
-
-        async function load() {
-            setLoading(true)
-            try {
-                const data = await getTasks({ orgId, clientId, dealId, view: 'all' })
-                if (cancelled) return
-                setTasks(sortTasks(data))
-            } catch (err) {
-                console.error('Failed to load entity tasks', err)
-            } finally {
-                if (!cancelled) setLoading(false)
-            }
-        }
-
-        load()
-        return () => { cancelled = true }
-    }, [orgId, clientId, dealId, sortTasks])
-
     const handleToggleComplete = useCallback(async (task: Task) => {
         const newStatus = task.status === 'completed' ? 'todo' : 'completed'
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+        qc.setQueryData<Task[]>(tasksKey, prev => prev?.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
         try {
             await updateTask(task.id, { status: newStatus })
         } catch {
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+            qc.setQueryData<Task[]>(tasksKey, prev => prev?.map(t => t.id === task.id ? { ...t, status: task.status } : t))
         }
-    }, [])
+    }, [qc, tasksKey])
 
     const openInlineAdd = useCallback(() => {
         setEditingTaskId(undefined)
@@ -135,7 +108,7 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
                 created_at: new Date().toISOString(),
                 actor_id: user.id,
             })
-            await loadTasks()
+            qc.invalidateQueries({ queryKey: tasksKey })
             setAdding(false)
             setAddTitle('')
         } catch (err) {
@@ -143,17 +116,17 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
         } finally {
             setAddSaving(false)
         }
-    }, [user, orgId, addTitle, addDue, clientId, dealId, onActivityAdded, loadTasks])
+    }, [user, orgId, addTitle, addDue, clientId, dealId, onActivityAdded, qc, tasksKey])
 
     const handleInlineEdit = useCallback(async (task: Task, title: string, dueAt: string) => {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
+        qc.setQueryData<Task[]>(tasksKey, prev => prev?.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
         setEditingTaskId(undefined)
         try {
             await updateTask(task.id, { title, due_at: toISO(dueAt) })
         } catch {
-            setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+            qc.setQueryData<Task[]>(tasksKey, prev => prev?.map(t => t.id === task.id ? task : t))
         }
-    }, [])
+    }, [qc, tasksKey])
 
     const handleTaskClick = useCallback((task: Task) => {
         if (inlineAdd) {
@@ -253,7 +226,7 @@ export default function EntityTasks({ orgId, clientId, dealId, inlineAdd, onActi
                 <TaskDialog
                     isOpen={isDialogOpen}
                     onClose={() => setIsDialogOpen(false)}
-                    onSaved={loadTasks}
+                    onSaved={() => qc.invalidateQueries({ queryKey: tasksKey })}
                     orgId={orgId}
                     taskToEdit={taskToEdit}
                     defaultClientId={clientId}

@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { Plus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { supabase } from '@/lib/supabase'
-import { getTasks, createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
+import { useClients } from '@/hooks/queries/useClients'
+import { useTasks as useTasksQuery } from '@/hooks/queries/useTasks'
+import { queryKeys } from '@/lib/queryKeys'
+import { createTask, updateTask, setTaskClientLink } from '@/lib/tasks'
 import type { Task, TaskInsert } from '@/lib/tasks'
 import { todayString, toISO } from '@/lib/date-utils'
 import { useMention } from '@/hooks/useMention'
@@ -21,20 +24,17 @@ export default function TasksPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
 
-    const [tasks, setTasks] = useState<Task[]>([])
-    const [loading, setLoading] = useState(true)
     const [view, setView] = useState<ViewType>('today')
 
-    // Available clients for @mention
-    const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
+    // Tasks from TanStack Query
+    const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasksQuery({ orgId: orgId ?? '', view })
 
-    useEffect(() => {
-        if (!orgId) return
-        let cancelled = false
-        supabase.from('clients').select('id, name').eq('org_id', orgId).order('name')
-            .then(({ data }) => { if (!cancelled) setAvailableClients(data ?? []) })
-        return () => { cancelled = true }
-    }, [orgId])
+    // Available clients for @mention via TanStack Query (deduplicated across app)
+    const { data: clientsData = [] } = useClients(orgId ?? undefined)
+    const availableClients = useMemo<ClientOption[]>(
+        () => clientsData.map(c => ({ id: c.id, name: c.name })),
+        [clientsData]
+    )
 
     // Inline add state
     const [addingNew, setAddingNew] = useState(false)
@@ -49,38 +49,9 @@ export default function TasksPage() {
     // Inline edit state
     const [editingTaskId, setEditingTaskId] = useState<string | undefined>(undefined)
 
-    const loadTasks = useCallback(async (silent = false) => {
-        if (!orgId) return
-        if (!silent) setLoading(true)
-        try {
-            const data = await getTasks({ orgId, view })
-            setTasks(data)
-        } catch (error) {
-            console.error('Failed to load tasks', error)
-        } finally {
-            if (!silent) setLoading(false)
-        }
-    }, [orgId, view])
-
-    useEffect(() => {
-        if (!orgId) return
-        let cancelled = false
-
-        async function load() {
-            setLoading(true)
-            try {
-                const data = await getTasks({ orgId: orgId!, view })
-                if (!cancelled) setTasks(data)
-            } catch (error) {
-                console.error('Failed to load tasks', error)
-            } finally {
-                if (!cancelled) setLoading(false)
-            }
-        }
-
-        load()
-        return () => { cancelled = true }
-    }, [orgId, view])
+    const loadTasks = useCallback(async () => {
+        refetchTasks()
+    }, [refetchTasks])
 
     const openInlineAdd = useCallback(() => {
         setNewTitle('')
@@ -135,33 +106,46 @@ export default function TasksPage() {
         }
     }, [user, orgId, newTitle, newDue, addSaving, mention, loadTasks])
 
+    const qc = useQueryClient()
+    const tasksQueryKey = queryKeys.tasks.filtered(orgId ?? '', view)
+
     const handleToggleComplete = useCallback(async (task: Task) => {
         const newStatus = task.status === 'completed' ? 'todo' : 'completed'
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+        // Optimistic update
+        qc.setQueryData<Task[]>(tasksQueryKey, old =>
+            old?.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
+        )
         try {
             await updateTask(task.id, { status: newStatus })
             if (newStatus === 'completed' && view !== 'today') {
-                setTimeout(() => loadTasks(true), 500)
+                setTimeout(() => refetchTasks(), 500)
             }
         } catch (error) {
             console.error('Failed to update task', error)
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+            qc.setQueryData<Task[]>(tasksQueryKey, old =>
+                old?.map(t => t.id === task.id ? { ...t, status: task.status } : t)
+            )
         }
-    }, [view, loadTasks])
+    }, [view, qc, tasksQueryKey, refetchTasks])
 
     const handleInlineEdit = useCallback(async (task: Task, title: string, dueAt: string, clientId?: string | null) => {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t))
+        // Optimistic update
+        qc.setQueryData<Task[]>(tasksQueryKey, old =>
+            old?.map(t => t.id === task.id ? { ...t, title, due_at: toISO(dueAt) } : t)
+        )
         setEditingTaskId(undefined)
         try {
             await updateTask(task.id, { title, due_at: toISO(dueAt) })
             if (orgId && user && clientId !== undefined) {
                 await setTaskClientLink(task.id, orgId, clientId, user.id)
             }
-            await loadTasks(true)
+            await refetchTasks()
         } catch {
-            setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+            qc.setQueryData<Task[]>(tasksQueryKey, old =>
+                old?.map(t => t.id === task.id ? task : t)
+            )
         }
-    }, [orgId, user, loadTasks])
+    }, [orgId, user, qc, tasksQueryKey, refetchTasks])
 
     const handleTaskClick = useCallback((task: Task) => {
         setAddingNew(false)

@@ -1,14 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useClients, useCreateClient } from '@/hooks/queries/useClients'
 import { Input } from '@/components/ui/input'
-
-interface Client {
-    id: string
-    name: string
-    source: string | null
-}
 
 interface ClientSelectorProps {
     orgId: string
@@ -29,30 +23,11 @@ export default function ClientSelector({
 }: ClientSelectorProps) {
 
     const { user } = useAuth()
-    const [clients, setClients] = useState<Client[]>([])
+    const { data: clients = [] } = useClients(orgId)
+    const createClientMutation = useCreateClient(orgId)
     const [clientSearch, setClientSearch] = useState(defaultSearch)
     const [clientDropdownOpen, setClientDropdownOpen] = useState(false)
-    const [creatingClient, setCreatingClient] = useState(false)
     const [localError, setLocalError] = useState<string | null>(null)
-
-    useEffect(() => {
-        if (!orgId) return
-        supabase
-            .from('clients')
-            .select('id, name, source')
-            .eq('org_id', orgId)
-            .order('name')
-            .then(({ data }) => setClients(data ?? []))
-    }, [orgId])
-
-    useEffect(() => {
-        // If external value is cleared but we have a search term (and it's not the name of a selected client), reset it?
-        // Let's just update search term if a valid defaultSearch prop changes and we have no value.
-        // Usually, the parent controls `value`.
-        if (!value && !clientDropdownOpen && clientSearch !== defaultSearch && defaultSearch !== '') {
-            //setClientSearch(defaultSearch)
-        }
-    }, [value, defaultSearch, clientDropdownOpen, clientSearch])
 
     const filteredClients = useMemo(
         () => clients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase())),
@@ -65,35 +40,24 @@ export default function ClientSelector({
     )
 
     async function handleCreateClient() {
-        if (!user || !clientSearch.trim() || creatingClient) return
-        setCreatingClient(true)
+        if (!user || !clientSearch.trim() || createClientMutation.isPending) return
         setLocalError(null)
 
         const clientName = clientSearch.trim()
 
         try {
-            const { data, error: createError } = await supabase
-                .from('clients')
-                .insert({
-                    org_id: orgId,
-                    owner_id: user.id,
-                    name: clientName,
-                })
-                .select('id, name')
-                .single()
-
-            if (createError) throw createError
+            const data = await createClientMutation.mutateAsync({
+                owner_id: user.id,
+                name: clientName,
+            })
 
             if (data) {
-                setClients((prev) => [...prev, data])
                 onChange(data.id, data.name)
                 setClientSearch(data.name)
                 setClientDropdownOpen(false)
             }
         } catch (err: unknown) {
             setLocalError((err as Error).message || 'Failed to create client')
-        } finally {
-            setCreatingClient(false)
         }
     }
 
@@ -163,7 +127,7 @@ export default function ClientSelector({
                         <div className="border-t border-border bg-muted/20">
                             <button
                                 type="button"
-                                disabled={creatingClient}
+                                disabled={createClientMutation.isPending}
                                 onClick={handleCreateClient}
                                 className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
                             >

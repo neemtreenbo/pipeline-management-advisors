@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
 import { useDebouncedSave } from '@/hooks/useDebouncedSave'
-import { fetchDealsByClient } from '@/lib/deals'
-import type { Deal } from '@/lib/deals'
+import { useClientDetail, type ClientListItem } from '@/hooks/queries/useClients'
+import { useDealsByClient } from '@/hooks/queries/useDeals'
+import { queryKeys } from '@/lib/queryKeys'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,35 +17,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
-
-interface Client {
-    id: string
-    name: string
-    email: string | null
-    phone: string | null
-    source: string | null
-    tags: string[]
-    data: Record<string, unknown>
-    created_at: string
-    updated_at: string
-    owner_id: string
-    org_id: string
-    job_title?: string | null
-    occupation?: string | null
-    profile_picture_url?: string | null
-    experiences?: any | null
-    education?: any | null
-    updates?: any | null
-    ai_summary?: string | null
-    talking_points?: any | null
-    company_name?: string | null
-    company_industry?: string | null
-    company_website?: string | null
-    linkedin_url?: string | null
-    facebook_url?: string | null
-    instagram_url?: string | null
-    tiktok_url?: string | null
-}
 
 const SOURCE_COLORS: Record<string, 'accent' | 'success' | 'warning' | 'muted'> = {
     referral: 'success',
@@ -85,25 +58,14 @@ function InfoRow({ label, value, showEmpty = false }: { label: string; value: st
     )
 }
 
-function EmptySection({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
-    return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
-                <Icon size={20} className="text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground">No {label} yet.</p>
-        </div>
-    )
-}
-
 export default function ClientDetailPage() {
     const { clientId } = useParams<{ clientId: string }>()
     const navigate = useNavigate()
 
-    const [client, setClient] = useState<Client | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [notFound, setNotFound] = useState(false)
-    const [deals, setDeals] = useState<Deal[]>([])
+    const qc = useQueryClient()
+    const { data: client = null, isLoading: clientLoading, isError: notFound } = useClientDetail(clientId)
+    const { data: deals = [], isLoading: dealsLoading } = useDealsByClient(clientId)
+    const loading = clientLoading || dealsLoading
     const [activities, setActivities] = useState<Array<{
         id: string; event_type: string; entity_type: string; entity_id: string; data: Record<string, unknown>; created_at: string; actor_id: string
     }>>([])
@@ -130,8 +92,8 @@ export default function ClientDetailPage() {
     }, [clientId])
     const debouncedSaveInstagram = useDebouncedSave(saveInstagram)
 
-    const handleActivityAdded = useCallback((a: typeof activities[number]) => {
-        setActivities(prev => [a, ...prev])
+    const handleActivityAdded = useCallback((a: { id: string; event_type: string; entity_type?: string; entity_id?: string; data: Record<string, unknown>; created_at: string; actor_id: string }) => {
+        setActivities(prev => [{ ...a, entity_type: a.entity_type ?? '', entity_id: a.entity_id ?? '' }, ...prev])
     }, [])
 
     const contextDeals = useMemo(
@@ -139,73 +101,61 @@ export default function ClientDetailPage() {
         [deals, client?.name]
     )
 
+    // Initialize edit form when client data loads
     useEffect(() => {
-        fetchClient()
-    }, [clientId])
-
-    async function fetchClient() {
-        setLoading(true)
-        const { data, error } = await supabase
-            .from('clients')
-            .select('*')
-            .eq('id', clientId)
-            .single()
-
-        if (error || !data) {
-            setNotFound(true)
-        } else {
-            setClient(data as Client)
+        if (client) {
             setEditForm({
-                name: data.name,
-                email: data.email ?? '',
-                phone: data.phone ?? '',
-                source: data.source ?? '',
-                tags: (data.tags ?? []).join(', '),
+                name: client.name,
+                email: client.email ?? '',
+                phone: client.phone ?? '',
+                source: client.source ?? '',
+                tags: (client.tags ?? []).join(', '),
             })
-            // Fetch linked deals then use their IDs to load all related activities
-            fetchDealsByClient(data.id).then(async (clientDeals) => {
-                setDeals(clientDeals)
-                const dealIds = clientDeals.map(d => d.id)
-
-                // Fetch linked notes and tasks to this client OR deals
-                let orLinkQuery = `and(to_type.eq.client,to_id.eq.${data.id})`
-                if (dealIds.length > 0) {
-                    orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
-                }
-                const { data: links } = await supabase
-                    .from('links')
-                    .select('from_id, from_type')
-                    .in('from_type', ['note', 'task'])
-                    .or(orLinkQuery)
-
-                const noteIds = Array.from(new Set(links?.filter(l => l.from_type === 'note').map(l => l.from_id) || []))
-                const taskIds = Array.from(new Set(links?.filter(l => l.from_type === 'task').map(l => l.from_id) || []))
-
-                // Build OR filter: client activities + deal activities + note activities + task activities
-                let query = supabase
-                    .from('activities')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-
-                const chunks = [`and(entity_type.eq.client,entity_id.eq.${data.id})`]
-                if (dealIds.length > 0) {
-                    chunks.push(`and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`)
-                }
-                if (noteIds.length > 0) {
-                    chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
-                }
-                if (taskIds.length > 0) {
-                    chunks.push(`and(entity_type.eq.task,entity_id.in.(${taskIds.join(',')}))`)
-                }
-
-                query = query.or(chunks.join(','))
-
-                const { data: acts } = await query
-                setActivities(acts ?? [])
-            }).catch(() => { setDeals([]); setActivities([]) })
         }
-        setLoading(false)
-    }
+    }, [client?.id])
+
+    // Fetch aggregated activities when client + deals are loaded
+    useEffect(() => {
+        if (!client || !clientId) return
+        const dealIds = deals.map(d => d.id)
+
+        async function fetchActivities() {
+            let orLinkQuery = `and(to_type.eq.client,to_id.eq.${clientId})`
+            if (dealIds.length > 0) {
+                orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
+            }
+            const { data: links } = await supabase
+                .from('links')
+                .select('from_id, from_type')
+                .in('from_type', ['note', 'task'])
+                .or(orLinkQuery)
+
+            const noteIds = Array.from(new Set(links?.filter(l => l.from_type === 'note').map(l => l.from_id) || []))
+            const taskIds = Array.from(new Set(links?.filter(l => l.from_type === 'task').map(l => l.from_id) || []))
+
+            let query = supabase
+                .from('activities')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            const chunks = [`and(entity_type.eq.client,entity_id.eq.${clientId})`]
+            if (dealIds.length > 0) {
+                chunks.push(`and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`)
+            }
+            if (noteIds.length > 0) {
+                chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
+            }
+            if (taskIds.length > 0) {
+                chunks.push(`and(entity_type.eq.task,entity_id.in.(${taskIds.join(',')}))`)
+            }
+
+            query = query.or(chunks.join(','))
+            const { data: acts } = await query
+            setActivities(acts ?? [])
+        }
+
+        fetchActivities().catch(() => setActivities([]))
+    }, [client?.id, deals])
 
     async function handleSave() {
         if (!client || !editForm.name.trim()) return
@@ -223,7 +173,8 @@ export default function ClientDetailPage() {
         }).eq('id', client.id)
 
         if (error) { setSaveError(error.message); setSaving(false); return }
-        await fetchClient()
+        qc.invalidateQueries({ queryKey: queryKeys.clients.detail(clientId!) })
+        qc.invalidateQueries({ queryKey: ['clients'] })
         setEditing(false)
         setSaving(false)
     }
@@ -253,7 +204,7 @@ export default function ClientDetailPage() {
                 console.error("Webhook error:", error);
                 alert("Failed to sync with LinkedIn. See console for details.");
             } else {
-                await fetchClient();
+                qc.invalidateQueries({ queryKey: queryKeys.clients.detail(clientId!) })
             }
         } catch (err) {
             console.error("Error invoking webhook:", err);
@@ -510,9 +461,9 @@ export default function ClientDetailPage() {
                                                 </div>
                                             )}
                                         </div>
-                                        {client.tags.length > 0 && (
+                                        {(client.tags ?? []).length > 0 && (
                                             <div className="flex flex-wrap gap-1.5 mt-2">
-                                                {client.tags.map(tag => (
+                                                {(client.tags ?? []).map(tag => (
                                                     <Badge key={tag} variant="outline">
                                                         <Tag size={10} className="mr-1" />
                                                         {tag}
@@ -572,9 +523,9 @@ export default function ClientDetailPage() {
                                 <InfoRow label="Member since" value={memberSince} />
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</span>
-                                    {client.tags.length > 0 ? (
+                                    {(client.tags ?? []).length > 0 ? (
                                         <div className="flex flex-wrap gap-1.5 mt-1">
-                                            {client.tags.map(tag => (
+                                            {(client.tags ?? []).map(tag => (
                                                 <Badge key={tag} variant="outline">
                                                     <Tag size={10} className="mr-1" />
                                                     {tag}
@@ -622,7 +573,7 @@ export default function ClientDetailPage() {
                                                 value={client.linkedin_url || ''}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    setClient(c => c ? { ...c, linkedin_url: val } : c);
+                                                    qc.setQueryData<ClientListItem>(queryKeys.clients.detail(clientId!), c => c ? { ...c, linkedin_url: val } : c as unknown as ClientListItem);
                                                     debouncedSaveLinkedIn(val);
                                                 }}
                                             />
@@ -660,7 +611,7 @@ export default function ClientDetailPage() {
                                                 value={client.instagram_url || ''}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    setClient(c => c ? { ...c, instagram_url: val } : c);
+                                                    qc.setQueryData<ClientListItem>(queryKeys.clients.detail(clientId!), c => c ? { ...c, instagram_url: val } : c as unknown as ClientListItem);
                                                     debouncedSaveInstagram(val);
                                                 }}
                                             />
@@ -681,7 +632,7 @@ export default function ClientDetailPage() {
 
                                 {/* Right Column: Insight Displays */}
                                 <div className="lg:col-span-2 flex flex-col gap-6">
-                                    {!client.ai_summary && !client.talking_points && !client.experiences && !client.education ? (
+                                    {(!(client.ai_summary as string | null) && !(client.talking_points as unknown) && !client.experiences && !client.education) ? (
                                         <div className="rounded-xl border border-dashed border-border bg-muted/30 min-h-[300px] flex flex-col items-center justify-center text-center p-8">
                                             <Activity className="text-muted-foreground mb-4" size={24} />
                                             <h3 className="text-sm font-medium text-foreground mb-1">No Intelligence Gathered</h3>
@@ -690,17 +641,17 @@ export default function ClientDetailPage() {
                                     ) : (
                                         <div className="flex flex-col gap-6">
                                             {/* AI Summary */}
-                                            {client.ai_summary && (
+                                            {client.ai_summary ? (
                                                 <div className="flex flex-col gap-3">
                                                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                                                         <FileText size={16} className="text-muted-foreground" />
                                                         Summary
                                                     </h3>
                                                     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                                                        <p className="text-[15px] text-foreground leading-relaxed">{client.ai_summary}</p>
+                                                        <p className="text-[15px] text-foreground leading-relaxed">{String(client.ai_summary)}</p>
                                                     </div>
                                                 </div>
-                                            )}
+                                            ) : null}
 
                                             {/* Talking Points */}
                                             {client.talking_points && (

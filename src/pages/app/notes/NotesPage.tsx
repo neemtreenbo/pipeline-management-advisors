@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { useState, useCallback, useMemo, memo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
-import { getNotesByOrgPaginated, createNote, getClientsForNotes } from '@/lib/notes'
+import { createNote } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
+import { useNotesPaginated, useNoteClientInfo } from '@/hooks/queries/useNotes'
 import { extractTextFromContent } from '@/lib/extract-text'
 import { Button } from '@/components/ui/button'
 
@@ -81,89 +82,32 @@ export default function NotesPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
     const navigate = useNavigate()
-    const PAGE_SIZE = 24
-    const [notes, setNotes] = useState<Note[]>([])
-    const [noteClients, setNoteClients] = useState<Record<string, NoteClientInfo>>({})
-    const [loading, setLoading] = useState(true)
-    const [hasMore, setHasMore] = useState(false)
-    const [cursor, setCursor] = useState<string | null>(null)
-    const [loadingMore, setLoadingMore] = useState(false)
-    const mountedRef = useRef(true)
 
-    useEffect(() => {
-        mountedRef.current = true
-        return () => { mountedRef.current = false }
-    }, [])
+    const {
+        data: paginatedData,
+        isLoading: loading,
+        hasNextPage: hasMore,
+        isFetchingNextPage: loadingMore,
+        fetchNextPage,
+    } = useNotesPaginated(orgId ?? undefined)
 
-    // Load client metadata for a batch of notes (non-blocking)
-    const loadClientInfo = useCallback(async (noteIds: string[], cancelled: { current: boolean }) => {
-        if (noteIds.length === 0) return
-        try {
-            const clientInfos = await getClientsForNotes(noteIds)
-            if (cancelled.current) return
-            setNoteClients(prev => {
-                const merged = { ...prev }
-                clientInfos.forEach(c => { merged[c.noteId] = c })
-                return merged
-            })
-        } catch {
-            // Client metadata is non-critical — notes still display
-        }
-    }, [])
+    const notes = useMemo(
+        () => paginatedData?.pages.flatMap(p => p.notes) ?? [],
+        [paginatedData]
+    )
 
-    useEffect(() => {
-        if (!orgId) return
-        const cancelled = { current: false }
+    const noteIds = useMemo(() => notes.map(n => n.id), [notes])
+    const { data: clientInfoList = [] } = useNoteClientInfo(noteIds)
 
-        async function loadNotes() {
-            setLoading(true)
-            try {
-                // Load notes and client metadata in parallel before rendering
-                const result = await getNotesByOrgPaginated(orgId!, PAGE_SIZE)
-                if (cancelled.current) return
+    const noteClients = useMemo(() => {
+        const map: Record<string, NoteClientInfo> = {}
+        clientInfoList.forEach(c => { map[c.noteId] = c })
+        return map
+    }, [clientInfoList])
 
-                // Fetch client info before showing — avoids "Standalone" flash
-                const noteIds = result.notes.map(n => n.id)
-                if (noteIds.length > 0) {
-                    const clientInfos = await getClientsForNotes(noteIds)
-                    if (cancelled.current) return
-                    const merged: Record<string, NoteClientInfo> = {}
-                    clientInfos.forEach(c => { merged[c.noteId] = c })
-                    setNoteClients(merged)
-                }
-
-                setNotes(result.notes)
-                setHasMore(result.hasMore)
-                setCursor(result.nextCursor)
-            } catch (error) {
-                console.error('Failed to load notes', error)
-            } finally {
-                if (!cancelled.current) setLoading(false)
-            }
-        }
-
-        loadNotes()
-        return () => { cancelled.current = true }
-    }, [orgId])
-
-    const loadMore = useCallback(async () => {
-        if (!orgId || !hasMore || loadingMore) return
-        setLoadingMore(true)
-        try {
-            const result = await getNotesByOrgPaginated(orgId, PAGE_SIZE, cursor)
-            setNotes(prev => [...prev, ...result.notes])
-            setHasMore(result.hasMore)
-            setCursor(result.nextCursor)
-
-            // Fetch client info for the new batch
-            const cancelled = { current: false }
-            loadClientInfo(result.notes.map(n => n.id), cancelled)
-        } catch (error) {
-            console.error('Failed to load more notes', error)
-        } finally {
-            setLoadingMore(false)
-        }
-    }, [orgId, hasMore, cursor, loadingMore, loadClientInfo])
+    const loadMore = useCallback(() => {
+        if (hasMore && !loadingMore) fetchNextPage()
+    }, [hasMore, loadingMore, fetchNextPage])
 
     const handleCreateNote = useCallback(async () => {
         if (!orgId || !user) return

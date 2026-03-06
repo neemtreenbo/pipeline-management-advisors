@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Task } from '@/lib/tasks'
-import { getClientsForTasks } from '@/lib/tasks'
-import { supabase } from '@/lib/supabase'
 import type { ClientOption } from '@/hooks/useMention'
+import { useTaskClientInfo } from '@/hooks/queries/useTasks'
+import { useClients } from '@/hooks/queries/useClients'
 import TaskItem from './TaskItem'
 
 interface TaskListProps {
@@ -28,43 +28,20 @@ export default function TaskList({
     onSaveEdit,
     onCancelEdit,
 }: TaskListProps) {
-    const [clientsMap, setClientsMap] = useState<Record<string, { id: string; name: string; profilePictureUrl: string | null }>>({})
-    const [availableClients, setAvailableClients] = useState<ClientOption[]>([])
+    const taskIds = useMemo(() => tasks.map(t => t.id), [tasks])
+    const { data: clientInfos = [] } = useTaskClientInfo(taskIds)
+    const { data: clientsList = [] } = useClients(orgId)
 
-    // Memoize task IDs to avoid unnecessary refetches
-    const taskIdKey = useMemo(() => tasks.map(t => t.id).join(','), [tasks])
+    const clientsMap = useMemo(() => {
+        const cMap: Record<string, { id: string; name: string; profilePictureUrl: string | null }> = {}
+        clientInfos.forEach(i => { cMap[i.taskId] = { id: i.clientId, name: i.clientName, profilePictureUrl: i.profilePictureUrl } })
+        return cMap
+    }, [clientInfos])
 
-    useEffect(() => {
-        if (!tasks || tasks.length === 0) { setClientsMap({}); return }
-        let cancelled = false
-
-        async function loadClients() {
-            try {
-                const infos = await getClientsForTasks(tasks.map(t => t.id))
-                if (cancelled) return
-                const cMap: Record<string, { id: string; name: string; profilePictureUrl: string | null }> = {}
-                infos.forEach(i => { cMap[i.taskId] = { id: i.clientId, name: i.clientName, profilePictureUrl: i.profilePictureUrl } })
-                setClientsMap(cMap)
-            } catch (err) {
-                console.error('Failed to load clients', err)
-            }
-        }
-
-        loadClients()
-        return () => { cancelled = true }
-    }, [taskIdKey])
-
-    useEffect(() => {
-        if (!orgId) return
-        let cancelled = false
-        supabase
-            .from('clients')
-            .select('id, name')
-            .eq('org_id', orgId)
-            .order('name')
-            .then(({ data }) => { if (!cancelled) setAvailableClients(data ?? []) })
-        return () => { cancelled = true }
-    }, [orgId])
+    const availableClients = useMemo<ClientOption[]>(
+        () => clientsList.map(c => ({ id: c.id, name: c.name })),
+        [clientsList]
+    )
 
     if (!tasks || tasks.length === 0) {
         return (

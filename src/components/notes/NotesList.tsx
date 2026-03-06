@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Calendar, ExternalLink } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
-import { getNotesLinkedToEntity, createNote, linkNoteToEntity, updateNote } from '@/lib/notes'
+import { createNote, linkNoteToEntity, updateNote } from '@/lib/notes'
 import type { Note } from '@/lib/notes'
+import { useEntityNotes } from '@/hooks/queries/useNotes'
+import { queryKeys } from '@/lib/queryKeys'
 import { extractTextFromContent } from '@/lib/extract-text'
 
 type OptimisticActivity = {
@@ -31,8 +34,9 @@ function makeParagraphContent(text: string) {
 
 export default function NotesList({ entityType, entityId, orgId, inlineAdd, onActivityAdded }: NotesListProps) {
     const { user } = useAuth()
-    const [notes, setNotes] = useState<Note[]>([])
-    const [loading, setLoading] = useState(true)
+    const qc = useQueryClient()
+    const { data: notes = [], isLoading: loading } = useEntityNotes(entityType, entityId)
+    const notesKey = queryKeys.notes.byEntity(entityType, entityId)
 
     // Inline add state
     const [adding, setAdding] = useState(false)
@@ -44,34 +48,6 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd, onAc
     // Inline edit state (title only)
     const [editingNoteId, setEditingNoteId] = useState<string | undefined>()
     const [editTitle, setEditTitle] = useState('')
-
-    useEffect(() => {
-        if (!entityType || !entityId) return
-        let cancelled = false
-
-        async function load() {
-            setLoading(true)
-            try {
-                const data = await getNotesLinkedToEntity(entityType, entityId)
-                if (!cancelled) setNotes(data)
-            } catch (err) {
-                console.error('Failed to load linked notes', err)
-            } finally {
-                if (!cancelled) setLoading(false)
-            }
-        }
-
-        load()
-        return () => { cancelled = true }
-    }, [entityType, entityId])
-
-    const loadNotes = useCallback(async () => {
-        try {
-            setNotes(await getNotesLinkedToEntity(entityType, entityId))
-        } catch (err) {
-            console.error('Failed to load linked notes', err)
-        }
-    }, [entityType, entityId])
 
     const openInlineAdd = useCallback(() => {
         setEditingNoteId(undefined)
@@ -97,7 +73,7 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd, onAc
                 created_at: new Date().toISOString(),
                 actor_id: user.id,
             })
-            await loadNotes()
+            qc.invalidateQueries({ queryKey: notesKey })
             setAdding(false)
             setAddTitle('')
             setAddBody('')
@@ -106,7 +82,7 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd, onAc
         } finally {
             setAddSaving(false)
         }
-    }, [user, orgId, addTitle, addBody, entityType, entityId, onActivityAdded, loadNotes])
+    }, [user, orgId, addTitle, addBody, entityType, entityId, onActivityAdded, qc, notesKey])
 
     // Non-inline: navigate-away flow (original)
     const handleAddNoteNavigate = useCallback(async () => {
@@ -128,14 +104,14 @@ export default function NotesList({ entityType, entityId, orgId, inlineAdd, onAc
 
     const saveEditTitle = useCallback(async (note: Note) => {
         if (!editTitle.trim()) { setEditingNoteId(undefined); return }
-        setNotes(prev => prev.map(n => n.id === note.id ? { ...n, title: editTitle.trim() } : n))
+        qc.setQueryData<Note[]>(notesKey, prev => prev?.map(n => n.id === note.id ? { ...n, title: editTitle.trim() } : n))
         setEditingNoteId(undefined)
         try {
             await updateNote(note.id, { title: editTitle.trim() })
         } catch {
-            setNotes(prev => prev.map(n => n.id === note.id ? note : n))
+            qc.setQueryData<Note[]>(notesKey, prev => prev?.map(n => n.id === note.id ? note : n))
         }
-    }, [editTitle])
+    }, [editTitle, qc, notesKey])
 
     if (loading) {
         return <div className="py-8 text-center text-sm text-muted-foreground/40 animate-pulse">Loading…</div>

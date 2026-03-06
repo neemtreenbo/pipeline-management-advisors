@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import {
     X,
     ChevronDown,
@@ -8,20 +8,21 @@ import {
     Trash2,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { supabase } from '@/lib/supabase'
 import {
     PIPELINE_STAGES,
-    fetchDealById,
     updateDeal,
     updateDealStage,
     logDealActivity,
-    fetchDealActivities,
 } from '@/lib/deals'
 import type { Deal, DealStage } from '@/lib/deals'
-import { fetchAttachmentsByDeal } from '@/lib/attachments'
 import type { DealAttachment } from '@/lib/attachments'
+import { useDeal, useDealActivities } from '@/hooks/queries/useDeals'
+import { useDealAttachments } from '@/hooks/queries/useAttachments'
+import { queryKeys } from '@/lib/queryKeys'
 import ProposalUploader from '@/components/pipeline/ProposalUploader'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { getDealIcon } from './DealIcon'
@@ -44,13 +45,13 @@ interface DealDetailsModalProps {
 export default function DealDetailsModal({ dealId, onClose, onStageChange, onDeleted }: DealDetailsModalProps) {
     const { user } = useAuth()
     const { orgId } = useOrg()
+    const qc = useQueryClient()
 
-    const [deal, setDeal] = useState<Deal | null>(null)
-    const [attachments, setAttachments] = useState<DealAttachment[]>([])
-    const [activities, setActivities] = useState<Array<{
-        id: string; event_type: string; data: Record<string, unknown>; created_at: string; actor_id: string
-    }>>([])
-    const [loading, setLoading] = useState(true)
+    const { data: deal = null, isLoading: dealLoading } = useDeal(dealId)
+    const { data: attachments = [], isLoading: attachmentsLoading } = useDealAttachments(dealId)
+    const { data: activities = [], isLoading: activitiesLoading } = useDealActivities(dealId)
+    const loading = dealLoading || attachmentsLoading || activitiesLoading
+
     const [activeTab, setActiveTab] = useState<Tab>('tasks')
     const [editingStage, setEditingStage] = useState(false)
     const [editingValue, setEditingValue] = useState(false)
@@ -62,31 +63,11 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
 
-    const loadDeal = useCallback(async () => {
-        if (!dealId) return
-        setLoading(true)
-        try {
-            const [d, att, acts] = await Promise.all([
-                fetchDealById(dealId),
-                fetchAttachmentsByDeal(dealId),
-                fetchDealActivities(dealId),
-            ])
-            setDeal(d)
-            setAttachments(att)
-            setActivities(acts)
-        } finally {
-            setLoading(false)
-        }
-    }, [dealId])
-
-    useEffect(() => {
-        loadDeal()
-    }, [loadDeal])
-
     async function handleStageChange(newStage: DealStage) {
         if (!deal || !user || !orgId) return
         const oldStage = deal.stage
-        setDeal((d) => d ? { ...d, stage: newStage } : d)
+        const dealKey = queryKeys.deals.detail(dealId)
+        qc.setQueryData<Deal>(dealKey, (d) => d ? { ...d, stage: newStage } : d as unknown as Deal)
         setEditingStage(false)
         onStageChange?.(deal.id, newStage)
         try {
@@ -95,10 +76,9 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                 from_stage: oldStage,
                 to_stage: newStage,
             })
-            const acts = await fetchDealActivities(deal.id)
-            setActivities(acts)
+            qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })
         } catch {
-            setDeal((d) => d ? { ...d, stage: oldStage } : d)
+            qc.setQueryData<Deal>(dealKey, (d) => d ? { ...d, stage: oldStage } : d as unknown as Deal)
         }
     }
 
@@ -106,7 +86,8 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
         if (!deal) return
         const newValue = parseFloat(valueDraft)
         if (isNaN(newValue)) { setEditingValue(false); return }
-        setDeal((d) => d ? { ...d, value: newValue } : d)
+        const dealKey = queryKeys.deals.detail(dealId)
+        qc.setQueryData<Deal>(dealKey, (d) => d ? { ...d, value: newValue } : d as unknown as Deal)
         setEditingValue(false)
         await updateDeal(deal.id, { value: newValue })
     }
@@ -121,7 +102,8 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
             : {}
 
         const newData = { ...currentData, title: newTitle }
-        setDeal((d) => d ? { ...d, data: newData } : d)
+        const dealKey = queryKeys.deals.detail(dealId)
+        qc.setQueryData<Deal>(dealKey, (d) => d ? { ...d, data: newData } : d as unknown as Deal)
         setEditingTitle(false)
         await updateDeal(deal.id, { title: newTitle })
     }
@@ -129,18 +111,19 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     async function handleDueDateSave() {
         if (!deal) return
         const newDate = dueDateDraft || null
-        setDeal((d) => d ? { ...d, due_date: newDate } : d)
+        const dealKey = queryKeys.deals.detail(dealId)
+        qc.setQueryData<Deal>(dealKey, (d) => d ? { ...d, due_date: newDate } : d as unknown as Deal)
         setEditingDueDate(false)
         await updateDeal(deal.id, { due_date: newDate })
     }
 
-    function handleAttachmentUploaded(attachment: DealAttachment) {
-        setAttachments((prev) => [attachment, ...prev])
-        if (dealId) fetchDealActivities(dealId).then(setActivities)
+    function handleAttachmentUploaded(_attachment: DealAttachment) {
+        qc.invalidateQueries({ queryKey: queryKeys.attachments.byDeal(dealId) })
+        qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })
     }
 
-    function handleAttachmentDeleted(id: string) {
-        setAttachments((prev) => prev.filter((a) => a.id !== id))
+    function handleAttachmentDeleted(_id: string) {
+        qc.invalidateQueries({ queryKey: queryKeys.attachments.byDeal(dealId) })
     }
 
     async function handleDelete() {
@@ -465,7 +448,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                     dealId={dealId}
                                     orgId={orgId}
                                     inlineAdd
-                                    onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                                    onActivityAdded={() => qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })}
                                 />
                             )}
                         </div>
@@ -489,7 +472,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                     entityId={dealId}
                                     orgId={orgId}
                                     inlineAdd
-                                    onActivityAdded={(a) => setActivities(prev => [a, ...prev])}
+                                    onActivityAdded={() => qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })}
                                 />
                             )}
                         </div>
