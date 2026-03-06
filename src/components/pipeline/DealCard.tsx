@@ -34,7 +34,6 @@ export default memo(function DealCard({
 }: DealCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
 
-    const clientName = deal.client?.name ?? 'Unknown Client'
     const title = (deal.data as Record<string, string>)?.title
 
     const hasProposal = proposalCount > 0
@@ -59,64 +58,52 @@ export default memo(function DealCard({
                             id={`deal-card-${deal.id}`}
                             onClick={() => setIsModalOpen(true)}
                             className={[
-                                'p-4 cursor-pointer select-none bg-card border-border/60',
-                                'hover:border-border hover:shadow-md hover:-translate-y-1 hover:scale-[1.015]',
+                                'px-3 py-2.5 cursor-pointer select-none bg-card border-border/60',
+                                'hover:border-border hover:shadow-md hover:-translate-y-0.5',
                                 'transition-all duration-150',
                                 snapshot.isDragging
                                     ? 'opacity-80 scale-[1.02] shadow-lg rotate-[0.5deg]'
                                     : '',
                             ].join(' ')}
                         >
-                            {/* Client label */}
-                            <p className="text-xs font-medium tracking-wider uppercase text-muted-foreground/60 truncate mb-1.5">
-                                {clientName}
-                            </p>
-
-                            {/* Deal title with inline icon */}
-                            <div className="flex items-start gap-1.5">
-                                <span className="text-muted-foreground/40 shrink-0 mt-px">
-                                    {getDealIcon(title || '', 14)}
+                            {/* Deal title with icon and value */}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-muted-foreground/40 shrink-0">
+                                    {getDealIcon(title || '', 13)}
                                 </span>
-                                <h3 className="text-sm font-medium text-foreground leading-snug">
-                                    {title || clientName}
+                                <h3 className="text-sm font-medium text-foreground leading-snug truncate flex-1">
+                                    {title || deal.client?.name || 'Untitled'}
                                 </h3>
+                                {formattedValue && (
+                                    <span className="text-xs text-foreground/50 font-medium tabular-nums shrink-0">
+                                        {formattedValue}
+                                    </span>
+                                )}
                             </div>
-
-                            {/* Value */}
-                            {formattedValue && (
-                                <p className="text-xs text-foreground/50 font-medium mt-1.5 tabular-nums">
-                                    {formattedValue}
-                                </p>
-                            )}
 
                             {/* Footer row */}
                             {(hasProposal || needsProposal || attachmentCount > 0 || closeDate) && (
-                                <div className="flex items-center gap-3 mt-2.5">
-                                    {/* Proposal status */}
+                                <div className="flex items-center gap-2.5 mt-1.5">
                                     {hasProposal && (
-                                        <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
+                                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
                                             <span className="w-1.5 h-1.5 rounded-full bg-success/70 shrink-0" />
                                             Proposal
                                         </span>
                                     )}
                                     {needsProposal && (
-                                        <span className="flex items-center gap-1 text-xs text-warning/80">
+                                        <span className="flex items-center gap-1 text-[11px] text-warning/80">
                                             <span className="w-1.5 h-1.5 rounded-full bg-warning/60 shrink-0" />
                                             Missing
                                         </span>
                                     )}
-
-                                    {/* Close date */}
                                     {closeDate && (
-                                        <span className="text-xs text-muted-foreground/50">
+                                        <span className="text-[11px] text-muted-foreground/50">
                                             {closeDate}
                                         </span>
                                     )}
-
-                                    {/* Attachments */}
                                     {attachmentCount > 0 && (
-                                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground/50 ml-auto">
-                                            <Paperclip size={12} />
+                                        <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground/50 ml-auto">
+                                            <Paperclip size={11} />
                                             {attachmentCount}
                                         </span>
                                     )}

@@ -118,25 +118,33 @@ export default function NotesPage() {
         async function loadNotes() {
             setLoading(true)
             try {
-                // Phase 1: Load first page of notes — render immediately
+                // Load notes and client metadata in parallel before rendering
                 const result = await getNotesByOrgPaginated(orgId!, PAGE_SIZE)
                 if (cancelled.current) return
+
+                // Fetch client info before showing — avoids "Standalone" flash
+                const noteIds = result.notes.map(n => n.id)
+                if (noteIds.length > 0) {
+                    const clientInfos = await getClientsForNotes(noteIds)
+                    if (cancelled.current) return
+                    const merged: Record<string, NoteClientInfo> = {}
+                    clientInfos.forEach(c => { merged[c.noteId] = c })
+                    setNoteClients(merged)
+                }
+
                 setNotes(result.notes)
                 setHasMore(result.hasMore)
                 setCursor(result.nextCursor)
-                setLoading(false)
-
-                // Phase 2: Load client metadata in background
-                loadClientInfo(result.notes.map(n => n.id), cancelled)
             } catch (error) {
                 console.error('Failed to load notes', error)
+            } finally {
                 if (!cancelled.current) setLoading(false)
             }
         }
 
         loadNotes()
         return () => { cancelled.current = true }
-    }, [orgId, loadClientInfo])
+    }, [orgId])
 
     const loadMore = useCallback(async () => {
         if (!orgId || !hasMore || loadingMore) return
