@@ -15,7 +15,6 @@ import {
 import type { Deal, DealStage, NewDealInput, StageTransition } from '@/lib/deals'
 import { fetchAttachmentCountsByDeals } from '@/lib/attachments'
 import KanbanColumn from '@/components/pipeline/KanbanColumn'
-import NewDealModal from '@/components/pipeline/NewDealModal'
 
 interface AttachmentCounts {
     [dealId: string]: { proposal: number; total: number }
@@ -33,8 +32,6 @@ export default function PipelinePage() {
     const [loading, setLoading] = useState(true)
     const dealsRef = useRef(deals)
     dealsRef.current = deals
-    const [showNewDeal, setShowNewDeal] = useState(false)
-    const [newDealStage, setNewDealStage] = useState<DealStage>('Opportunity')
 
     const loadDeals = useCallback(async () => {
         if (!orgId) return
@@ -148,7 +145,7 @@ export default function PipelinePage() {
         }
     }
 
-    async function handleNewDeal(input: NewDealInput) {
+    const handleCreateDeal = useCallback(async (input: NewDealInput) => {
         if (!user || !orgId) return
         try {
             const deal = await createDeal(input)
@@ -158,11 +155,10 @@ export default function PipelinePage() {
             })
             setDeals((prev) => [deal, ...prev])
             setAttachmentCounts((prev) => ({ ...prev, [deal.id]: { proposal: 0, total: 0 } }))
-            setShowNewDeal(false)
         } catch (err: unknown) {
             console.error('Failed to create deal:', err)
         }
-    }
+    }, [user, orgId])
 
     const handleDealStageChange = useCallback((dealId: string, newStage: DealStage) => {
         setDeals((prev) => prev.map((d) => d.id === dealId ? { ...d, stage: newStage } : d))
@@ -172,10 +168,6 @@ export default function PipelinePage() {
         setDeals((prev) => prev.filter((d) => d.id !== dealId))
     }, [])
 
-    const handleOpenNewDeal = useCallback((stage: DealStage) => {
-        setNewDealStage(stage)
-        setShowNewDeal(true)
-    }, [])
 
     return (
         <div className="min-h-screen bg-transparent flex flex-col">
@@ -198,22 +190,13 @@ export default function PipelinePage() {
                                 deals={dealsByStage[stage]}
                                 attachmentCounts={attachmentCounts}
                                 stageHistories={stageHistories}
-                                onAddDeal={handleOpenNewDeal}
+                                onCreateDeal={handleCreateDeal}
                                 onStageChange={handleDealStageChange}
                                 onDealDeleted={handleDealDeleted}
                             />
                         ))}
                     </div>
                 </DragDropContext>
-            )}
-
-            {showNewDeal && orgId && (
-                <NewDealModal
-                    orgId={orgId}
-                    defaultStage={newDealStage}
-                    onClose={() => setShowNewDeal(false)}
-                    onCreated={handleNewDeal}
-                />
             )}
 
             {dealIdFromSearch && (

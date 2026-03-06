@@ -1,9 +1,11 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Droppable } from '@hello-pangea/dnd'
-import type { Deal, DealStage, StageTransition } from '@/lib/deals'
+import { AnimatePresence } from 'framer-motion'
+import type { Deal, DealStage, NewDealInput, StageTransition } from '@/lib/deals'
 
 import DealCard from './DealCard'
+import InlineAddDeal from './InlineAddDeal'
 import { STAGE_COLORS } from './stageColors'
 
 interface AttachmentCounts {
@@ -15,7 +17,7 @@ interface KanbanColumnProps {
     deals: Deal[]
     attachmentCounts: AttachmentCounts
     stageHistories: Record<string, StageTransition[]>
-    onAddDeal: (stage: DealStage) => void
+    onCreateDeal: (input: NewDealInput) => void
     onStageChange?: (dealId: string, newStage: DealStage) => void
     onDealDeleted?: (dealId: string) => void
 }
@@ -60,10 +62,11 @@ export default memo(function KanbanColumn({
     deals,
     attachmentCounts,
     stageHistories,
-    onAddDeal,
+    onCreateDeal,
     onStageChange,
     onDealDeleted,
 }: KanbanColumnProps) {
+    const [isAdding, setIsAdding] = useState(false)
     const clientGroups = useMemo(() => groupDealsByClient(deals), [deals])
 
     // Build a flat index map for Draggable indices (must be sequential within droppable)
@@ -100,7 +103,7 @@ export default memo(function KanbanColumn({
                     )}
                 </div>
                 <button
-                    onClick={() => onAddDeal(stage)}
+                    onClick={() => setIsAdding(true)}
                     className="text-muted-foreground/70 dark:text-muted-foreground/50 hover:text-foreground transition-colors duration-150 p-0.5 rounded hover:bg-muted/60"
                     id={`add-deal-${stage.toLowerCase().replace(/\s+/g, '-')}`}
                     title={`Add deal to ${stage}`}
@@ -108,6 +111,22 @@ export default memo(function KanbanColumn({
                     <Plus size={13} />
                 </button>
             </div>
+
+            {/* Inline add deal form */}
+            <AnimatePresence>
+                {isAdding && (
+                    <div className="mb-2">
+                        <InlineAddDeal
+                            stage={stage}
+                            onCreated={(input) => {
+                                onCreateDeal(input)
+                                setIsAdding(false)
+                            }}
+                            onCancel={() => setIsAdding(false)}
+                        />
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Deal cards grouped by client */}
             <Droppable droppableId={stage}>
