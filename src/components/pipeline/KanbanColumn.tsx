@@ -76,11 +76,11 @@ export default memo(function KanbanColumn({
 
     return (
         <div
-            className="flex flex-col bg-muted dark:bg-muted/50 rounded-xl p-3 min-w-[280px] w-72 shrink-0"
+            className="flex flex-col bg-muted dark:bg-muted/50 rounded-xl p-3 min-w-[280px] w-72 shrink-0 max-h-[calc(100vh-140px)] overflow-y-auto"
             id={`kanban-column-${stage.toLowerCase().replace(/\s+/g, '-')}`}
         >
             {/* Column header */}
-            <div className="flex items-center justify-between mb-3 px-0.5">
+            <div className="sticky -top-3 z-10 flex items-center justify-between mb-3 pb-1 pt-3 -mt-3 -mx-3 px-3 bg-muted dark:bg-[hsl(var(--muted))] rounded-t-xl">
                 <div className="flex items-center gap-2">
                     <span
                         className="w-2 h-2 rounded-full shrink-0"
