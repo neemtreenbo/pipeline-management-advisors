@@ -268,6 +268,7 @@ export default function ClientDetailPage() {
 
             // Delete the client
             await supabase.from('clients').delete().eq('id', client.id)
+            qc.invalidateQueries({ queryKey: ['clients'] })
             navigate('/app/clients', { replace: true })
         } catch (err) {
             console.error('Failed to delete client', err)

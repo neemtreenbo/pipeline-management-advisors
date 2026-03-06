@@ -35,13 +35,22 @@ export function useClients(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.clients.list(orgId!),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('org_id', orgId!)
-        .order('name')
-      if (error) throw error
-      return (data ?? []) as ClientListItem[]
+      const PAGE_SIZE = 1000
+      let allData: ClientListItem[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('org_id', orgId!)
+          .order('name')
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw error
+        allData = allData.concat((data ?? []) as ClientListItem[])
+        if (!data || data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+      return allData
     },
     enabled: !!orgId,
   })

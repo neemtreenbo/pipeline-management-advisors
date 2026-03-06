@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useNavigate } from 'react-router-dom'
 import { Plus, X, Check, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown, Search, Users, Pencil, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,7 +14,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-type SortField = 'name' | 'source' | 'email' | 'phone'
+type SortField = 'name' | 'source' | 'email' | 'phone' | 'created_at'
 
 interface Client {
     id: string
@@ -245,6 +246,353 @@ function formatSource(src: string | null) {
     return src.replace(/_/g, ' ')
 }
 
+const ROW_HEIGHT = 52
+
+function VirtualizedClientTable({
+    filtered,
+    addingNew,
+    newRow,
+    setNewRow,
+    newNameRef,
+    newSourceTriggerRef,
+    newSourceOpen,
+    setNewSourceOpen,
+    saveNewRow,
+    cancelAddingNew,
+    createClientMutation,
+    sortField,
+    setSortField,
+    sortDir,
+    setSortDir,
+    inlineEdit,
+    handleEditChange,
+    saveInlineEdit,
+    handleCancelEdit,
+    startEdit,
+    inlineInputRef,
+    navigate,
+    isDark,
+}: {
+    filtered: Client[]
+    addingNew: boolean
+    newRow: { name: string; email: string; phone: string; source: string }
+    setNewRow: React.Dispatch<React.SetStateAction<{ name: string; email: string; phone: string; source: string }>>
+    newNameRef: React.RefObject<HTMLInputElement | null>
+    newSourceTriggerRef: React.RefObject<HTMLDivElement | null>
+    newSourceOpen: boolean
+    setNewSourceOpen: React.Dispatch<React.SetStateAction<boolean>>
+    saveNewRow: () => void
+    cancelAddingNew: () => void
+    createClientMutation: { isPending: boolean }
+    sortField: SortField
+    setSortField: (f: SortField) => void
+    sortDir: 'asc' | 'desc'
+    setSortDir: React.Dispatch<React.SetStateAction<'asc' | 'desc'>>
+    inlineEdit: InlineEdit | null
+    handleEditChange: (value: string) => void
+    saveInlineEdit: (overrideValue?: string) => void
+    handleCancelEdit: () => void
+    startEdit: (client: Client, field: InlineEdit['field']) => void
+    inlineInputRef: React.RefObject<HTMLInputElement | null>
+    navigate: (to: string) => void
+    isDark: boolean
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null)
+
+    const rowVirtualizer = useVirtualizer({
+        count: filtered.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: 20,
+    })
+
+    // Cap the Card height: content-driven up to viewport max
+    const headerHeight = 37 // thead row
+    const newRowHeight = addingNew ? 56 : 0
+    const contentHeight = headerHeight + newRowHeight + rowVirtualizer.getTotalSize()
+    const maxHeight = typeof window !== 'undefined' ? window.innerHeight - 220 : 600
+
+    return (
+        <Card
+            ref={scrollRef}
+            className="overflow-y-auto"
+            style={{ maxHeight: Math.min(contentHeight, maxHeight) }}
+        >
+            {/* Table header */}
+            <div className="sticky top-0 z-10 grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-2.5 border-b border-border/60 bg-muted dark:bg-card">
+                {[
+                    { field: 'name', label: 'Name' },
+                    { field: 'source', label: 'Source' },
+                    { field: 'email', label: 'Email' },
+                    { field: 'phone', label: 'Phone' },
+                    { field: 'created_at', label: 'Added' },
+                ].map(({ field, label }) => {
+                    const isActive = field && sortField === field;
+                    return (
+                        <button
+                            key={label}
+                            onClick={() => {
+                                if (!field) return
+                                if (isActive) {
+                                    setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                                } else {
+                                    setSortField(field as SortField)
+                                    setSortDir('asc')
+                                }
+                            }}
+                            className={`flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider text-left w-fit transition-colors duration-150 ${field ? 'hover:text-muted-foreground cursor-pointer' : 'cursor-default'}`}
+                        >
+                            {label}
+                            {field && (isActive ? (
+                                sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
+                            ) : (
+                                <ArrowUpDown size={11} className="opacity-40" />
+                            ))}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* New inline row */}
+            <AnimatePresence>
+                {addingNew && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <div className="grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-3 items-center border-b border-border/40 bg-accent/[0.02]">
+                            {/* Name */}
+                            <div className="pr-4 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                    <span className="text-[10px] text-muted-foreground/40">—</span>
+                                </div>
+                                <input
+                                    ref={newNameRef}
+                                    value={newRow.name}
+                                    onChange={e => setNewRow(r => ({ ...r, name: e.target.value }))}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                        if (e.key === 'Escape') cancelAddingNew()
+                                        if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-source')?.focus() }
+                                    }}
+                                    placeholder="Full name"
+                                    className="flex-1 text-sm bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all min-w-0 placeholder:text-muted-foreground/30 shadow-sm"
+                                />
+                            </div>
+
+                            {/* Source */}
+                            <div className="pr-4 relative" ref={newSourceTriggerRef}>
+                                <button
+                                    id="new-source"
+                                    type="button"
+                                    onClick={() => setNewSourceOpen(o => !o)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Escape') { cancelAddingNew(); setNewSourceOpen(false) }
+                                        if (e.key === 'Tab') { e.preventDefault(); setNewSourceOpen(false); document.getElementById('new-email')?.focus() }
+                                    }}
+                                    className="w-full flex items-center justify-between gap-1 text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all shadow-sm text-muted-foreground"
+                                >
+                                    <span className={newRow.source ? 'text-foreground' : ''}>
+                                        {newRow.source ? SOURCE_OPTIONS.find(o => o.value === newRow.source)?.label : 'Source'}
+                                    </span>
+                                    <ChevronDown size={12} className="text-muted-foreground/40 shrink-0" />
+                                </button>
+                                {newSourceOpen && (
+                                    <SourceDropdown
+                                        value={newRow.source}
+                                        onChange={(v) => setNewRow(r => ({ ...r, source: v }))}
+                                        onClose={() => setNewSourceOpen(false)}
+                                        options={SOURCE_OPTIONS}
+                                        triggerRef={newSourceTriggerRef}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Email */}
+                            <div className="pr-4">
+                                <input
+                                    id="new-email"
+                                    type="email"
+                                    value={newRow.email}
+                                    onChange={e => setNewRow(r => ({ ...r, email: e.target.value }))}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                        if (e.key === 'Escape') cancelAddingNew()
+                                        if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-phone')?.focus() }
+                                    }}
+                                    placeholder="Email"
+                                    className="w-full text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all placeholder:text-muted-foreground/30 shadow-sm"
+                                />
+                            </div>
+
+                            {/* Phone */}
+                            <div className="pr-3">
+                                <input
+                                    id="new-phone"
+                                    value={newRow.phone}
+                                    onChange={e => setNewRow(r => ({ ...r, phone: e.target.value }))}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
+                                        if (e.key === 'Escape') cancelAddingNew()
+                                    }}
+                                    placeholder="Phone"
+                                    className="w-full text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all placeholder:text-muted-foreground/30 shadow-sm"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={saveNewRow}
+                                    disabled={!newRow.name.trim() || createClientMutation.isPending}
+                                    className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors duration-150 disabled:opacity-25 disabled:cursor-not-allowed"
+                                >
+                                    <Check size={12} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    onClick={cancelAddingNew}
+                                    className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-muted/70 transition-colors duration-150"
+                                >
+                                    <X size={12} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Virtualized rows */}
+            <div
+                style={{
+                    height: rowVirtualizer.getTotalSize(),
+                    position: 'relative',
+                }}
+            >
+                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                    const client = filtered[virtualRow.index]
+                    const idx = virtualRow.index
+                    return (
+                        <div
+                            key={client.id}
+                            className={`absolute left-0 w-full`}
+                            style={{
+                                height: virtualRow.size,
+                                transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                        >
+                            <div
+                                className={`relative grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 h-full items-center ${idx < filtered.length - 1 ? 'border-b border-border/40' : ''} hover:bg-accent/[0.03] dark:hover:bg-accent/[0.06] transition-colors duration-150 group`}
+                            >
+                                {/* Left accent bar on hover */}
+                                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full" />
+
+                                {/* Name — click navigates */}
+                                <div
+                                    className="min-w-0 pr-4 flex items-center gap-3 cursor-pointer"
+                                    onClick={() => navigate(`/app/clients/${client.id}`)}
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent/20 to-accent/5 dark:from-accent/30 dark:to-accent/10 flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-transparent group-hover:ring-accent/20 transition-all duration-200">
+                                        {client.profile_picture_url ? (
+                                            <img src={client.profile_picture_url} alt={client.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-[11px] font-semibold text-accent/80">{getInitials(client.name)}</span>
+                                        )}
+                                    </div>
+                                    <span className="text-[13px] font-medium text-foreground truncate group-hover:text-accent transition-colors duration-200">{client.name}</span>
+                                </div>
+
+                                {/* Source */}
+                                <div className="pr-4">
+                                    <InlineCell
+                                        client={client}
+                                        field="source"
+                                        display={
+                                            client.source ? (
+                                                <span
+                                                    className="inline-flex items-center justify-center min-w-[5.5rem] px-2 py-0.5 rounded-full text-[11px] font-medium capitalize text-white/90"
+                                                    style={{
+                                                        backgroundColor: SOURCE_COLORS[client.source]
+                                                            ? getAccentBg(SOURCE_COLORS[client.source], isDark)
+                                                            : undefined,
+                                                    }}
+                                                >
+                                                    {formatSource(client.source)}
+                                                </span>
+                                            ) : null
+                                        }
+                                        placeholder="—"
+                                        isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'source'}
+                                        editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'source' ? inlineEdit.value : ''}
+                                        onEditChange={handleEditChange}
+                                        onSave={saveInlineEdit}
+                                        onCancel={handleCancelEdit}
+                                        onStartEdit={startEdit}
+                                    />
+                                </div>
+
+                                {/* Email */}
+                                <div className="pr-4 min-w-0">
+                                    <InlineCell
+                                        client={client}
+                                        field="email"
+                                        display={
+                                            client.email ? (
+                                                <span className="flex items-center gap-1.5 min-w-0">
+                                                    <Mail size={12} className="text-muted-foreground/40 shrink-0" />
+                                                    <span className="text-[13px] text-foreground/80 truncate">{client.email}</span>
+                                                </span>
+                                            ) : null
+                                        }
+                                        placeholder="—"
+                                        isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'email'}
+                                        editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'email' ? inlineEdit.value : ''}
+                                        onEditChange={handleEditChange}
+                                        onSave={saveInlineEdit}
+                                        onCancel={handleCancelEdit}
+                                        onStartEdit={startEdit}
+                                        inputRef={inlineInputRef}
+                                    />
+                                </div>
+
+                                {/* Phone */}
+                                <div className="pr-4">
+                                    <InlineCell
+                                        client={client}
+                                        field="phone"
+                                        display={
+                                            client.phone ? (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Phone size={12} className="text-muted-foreground/40 shrink-0" />
+                                                    <span className="text-[13px] text-foreground/80">{client.phone}</span>
+                                                </span>
+                                            ) : null
+                                        }
+                                        placeholder="—"
+                                        isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'phone'}
+                                        editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'phone' ? inlineEdit.value : ''}
+                                        onEditChange={handleEditChange}
+                                        onSave={saveInlineEdit}
+                                        onCancel={handleCancelEdit}
+                                        onStartEdit={startEdit}
+                                        inputRef={inlineInputRef}
+                                    />
+                                </div>
+
+                                {/* Added date */}
+                                <div className="text-[12px] text-muted-foreground/40 tabular-nums">
+                                    {formatDate(client.created_at)}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        </Card>
+    )
+}
+
 export default function ClientsPage() {
     const { user } = useAuth()
     const { orgId } = useOrg()
@@ -357,6 +705,11 @@ export default function ClientsPage() {
             result = result.filter(c => c.source === sourceFilter)
         }
         return result.sort((a, b) => {
+            if (sortField === 'created_at') {
+                const tA = new Date(a.created_at).getTime()
+                const tB = new Date(b.created_at).getTime()
+                return sortDir === 'asc' ? tA - tB : tB - tA
+            }
             const valA = (a[sortField] || '').toLowerCase()
             const valB = (b[sortField] || '').toLowerCase()
 
@@ -385,7 +738,9 @@ export default function ClientsPage() {
                     <h1 className="text-lg font-semibold text-foreground leading-none flex items-center gap-2">
                         Clients
                         {!loading && clients.length > 0 && (
-                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-normal bg-muted text-muted-foreground">{clients.length}</span>
+                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-normal bg-muted text-muted-foreground">
+                                {filtered.length === clients.length ? clients.length : `${filtered.length} / ${clients.length}`}
+                            </span>
                         )}
                     </h1>
                     <Button onClick={startAddingNew} className="h-8 text-xs rounded-full px-3 font-medium">
@@ -467,267 +822,31 @@ export default function ClientsPage() {
                         </Button>
                     </div>
                 ) : (
-                    <Card className="overflow-y-auto max-h-[calc(100vh-220px)]">
-                        {/* Table header */}
-                        <div className="sticky top-0 z-10 grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-2.5 border-b border-border/60 bg-muted dark:bg-card">
-                            {[
-                                { field: 'name', label: 'Name' },
-                                { field: 'source', label: 'Source' },
-                                { field: 'email', label: 'Email' },
-                                { field: 'phone', label: 'Phone' },
-                                { field: null, label: 'Added' },
-                            ].map(({ field, label }) => {
-                                const isActive = field && sortField === field;
-                                return (
-                                    <button
-                                        key={label}
-                                        onClick={() => {
-                                            if (!field) return
-                                            if (isActive) {
-                                                setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-                                            } else {
-                                                setSortField(field as SortField)
-                                                setSortDir('asc')
-                                            }
-                                        }}
-                                        className={`flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider text-left w-fit transition-colors duration-150 ${field ? 'hover:text-muted-foreground cursor-pointer' : 'cursor-default'}`}
-                                    >
-                                        {label}
-                                        {field && (isActive ? (
-                                            sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
-                                        ) : (
-                                            <ArrowUpDown size={11} className="opacity-40" />
-                                        ))}
-                                    </button>
-                                )
-                            })}
-                        </div>
-
-                        <div className="flex flex-col">
-                            {/* New inline row */}
-                            <AnimatePresence>
-                                {addingNew && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                    >
-                                        <div className="grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-3 items-center border-b border-border/40 bg-accent/[0.02]">
-                                            {/* Name */}
-                                            <div className="pr-4 flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                                    <span className="text-[10px] text-muted-foreground/40">—</span>
-                                                </div>
-                                                <input
-                                                    ref={newNameRef}
-                                                    value={newRow.name}
-                                                    onChange={e => setNewRow(r => ({ ...r, name: e.target.value }))}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
-                                                        if (e.key === 'Escape') cancelAddingNew()
-                                                        if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-source')?.focus() }
-                                                    }}
-                                                    placeholder="Full name"
-                                                    className="flex-1 text-sm bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all min-w-0 placeholder:text-muted-foreground/30 shadow-sm"
-                                                />
-                                            </div>
-
-                                            {/* Source */}
-                                            <div className="pr-4 relative" ref={newSourceTriggerRef}>
-                                                <button
-                                                    id="new-source"
-                                                    type="button"
-                                                    onClick={() => setNewSourceOpen(o => !o)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Escape') { cancelAddingNew(); setNewSourceOpen(false) }
-                                                        if (e.key === 'Tab') { e.preventDefault(); setNewSourceOpen(false); document.getElementById('new-email')?.focus() }
-                                                    }}
-                                                    className="w-full flex items-center justify-between gap-1 text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all shadow-sm text-muted-foreground"
-                                                >
-                                                    <span className={newRow.source ? 'text-foreground' : ''}>
-                                                        {newRow.source ? SOURCE_OPTIONS.find(o => o.value === newRow.source)?.label : 'Source'}
-                                                    </span>
-                                                    <ChevronDown size={12} className="text-muted-foreground/40 shrink-0" />
-                                                </button>
-                                                {newSourceOpen && (
-                                                    <SourceDropdown
-                                                        value={newRow.source}
-                                                        onChange={(v) => setNewRow(r => ({ ...r, source: v }))}
-                                                        onClose={() => setNewSourceOpen(false)}
-                                                        options={SOURCE_OPTIONS}
-                                                        triggerRef={newSourceTriggerRef}
-                                                    />
-                                                )}
-                                            </div>
-
-                                            {/* Email */}
-                                            <div className="pr-4">
-                                                <input
-                                                    id="new-email"
-                                                    type="email"
-                                                    value={newRow.email}
-                                                    onChange={e => setNewRow(r => ({ ...r, email: e.target.value }))}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
-                                                        if (e.key === 'Escape') cancelAddingNew()
-                                                        if (e.key === 'Tab') { e.preventDefault(); document.getElementById('new-phone')?.focus() }
-                                                    }}
-                                                    placeholder="Email"
-                                                    className="w-full text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all placeholder:text-muted-foreground/30 shadow-sm"
-                                                />
-                                            </div>
-
-                                            {/* Phone */}
-                                            <div className="pr-3">
-                                                <input
-                                                    id="new-phone"
-                                                    value={newRow.phone}
-                                                    onChange={e => setNewRow(r => ({ ...r, phone: e.target.value }))}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter' && newRow.name.trim()) saveNewRow()
-                                                        if (e.key === 'Escape') cancelAddingNew()
-                                                    }}
-                                                    placeholder="Phone"
-                                                    className="w-full text-[13px] bg-card border border-accent/30 rounded-lg px-2.5 py-1.5 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all placeholder:text-muted-foreground/30 shadow-sm"
-                                                />
-                                            </div>
-
-                                            {/* Actions */}
-                                            <div className="flex items-center gap-1.5">
-                                                <button
-                                                    onClick={saveNewRow}
-                                                    disabled={!newRow.name.trim() || createClientMutation.isPending}
-                                                    className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors duration-150 disabled:opacity-25 disabled:cursor-not-allowed"
-                                                >
-                                                    <Check size={12} strokeWidth={2.5} />
-                                                </button>
-                                                <button
-                                                    onClick={cancelAddingNew}
-                                                    className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-muted/70 transition-colors duration-150"
-                                                >
-                                                    <X size={12} strokeWidth={2.5} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-
-                            {filtered.map((client, idx) => (
-                                <motion.div
-                                    key={client.id}
-                                    initial={{ opacity: 0, y: 4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.15, delay: idx * 0.02 }}
-                                >
-                                    <div
-                                        className={`relative grid grid-cols-[2.6fr_1fr_1.6fr_1.4fr_0.9fr] px-5 py-3.5 items-center ${idx < filtered.length - 1 ? 'border-b border-border/40' : ''} hover:bg-accent/[0.03] dark:hover:bg-accent/[0.06] transition-all duration-200 group`}
-                                    >
-                                        {/* Left accent bar on hover */}
-                                        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full" />
-
-                                        {/* Name — click navigates */}
-                                        <div
-                                            className="min-w-0 pr-4 flex items-center gap-3 cursor-pointer"
-                                            onClick={() => navigate(`/app/clients/${client.id}`)}
-                                        >
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent/20 to-accent/5 dark:from-accent/30 dark:to-accent/10 flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-transparent group-hover:ring-accent/20 transition-all duration-200">
-                                                {client.profile_picture_url ? (
-                                                    <img src={client.profile_picture_url} alt={client.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <span className="text-[11px] font-semibold text-accent/80">{getInitials(client.name)}</span>
-                                                )}
-                                            </div>
-                                            <span className="text-[13px] font-medium text-foreground truncate group-hover:text-accent transition-colors duration-200">{client.name}</span>
-                                        </div>
-
-                                        {/* Source */}
-                                        <div className="pr-4">
-                                            <InlineCell
-                                                client={client}
-                                                field="source"
-                                                display={
-                                                    client.source ? (
-                                                        <span
-                                                            className="inline-flex items-center justify-center min-w-[5.5rem] px-2 py-0.5 rounded-full text-[11px] font-medium capitalize text-white/90"
-                                                            style={{
-                                                                backgroundColor: SOURCE_COLORS[client.source]
-                                                                    ? getAccentBg(SOURCE_COLORS[client.source], isDark)
-                                                                    : undefined,
-                                                            }}
-                                                        >
-                                                            {formatSource(client.source)}
-                                                        </span>
-                                                    ) : null
-                                                }
-                                                placeholder="—"
-                                                isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'source'}
-                                                editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'source' ? inlineEdit.value : ''}
-                                                onEditChange={handleEditChange}
-                                                onSave={saveInlineEdit}
-                                                onCancel={handleCancelEdit}
-                                                onStartEdit={startEdit}
-                                            />
-                                        </div>
-
-                                        {/* Email */}
-                                        <div className="pr-4 min-w-0">
-                                            <InlineCell
-                                                client={client}
-                                                field="email"
-                                                display={
-                                                    client.email ? (
-                                                        <span className="flex items-center gap-1.5 min-w-0">
-                                                            <Mail size={12} className="text-muted-foreground/40 shrink-0" />
-                                                            <span className="text-[13px] text-foreground/80 truncate">{client.email}</span>
-                                                        </span>
-                                                    ) : null
-                                                }
-                                                placeholder="—"
-                                                isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'email'}
-                                                editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'email' ? inlineEdit.value : ''}
-                                                onEditChange={handleEditChange}
-                                                onSave={saveInlineEdit}
-                                                onCancel={handleCancelEdit}
-                                                onStartEdit={startEdit}
-                                                inputRef={inlineInputRef}
-                                            />
-                                        </div>
-
-                                        {/* Phone */}
-                                        <div className="pr-4">
-                                            <InlineCell
-                                                client={client}
-                                                field="phone"
-                                                display={
-                                                    client.phone ? (
-                                                        <span className="flex items-center gap-1.5">
-                                                            <Phone size={12} className="text-muted-foreground/40 shrink-0" />
-                                                            <span className="text-[13px] text-foreground/80">{client.phone}</span>
-                                                        </span>
-                                                    ) : null
-                                                }
-                                                placeholder="—"
-                                                isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'phone'}
-                                                editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'phone' ? inlineEdit.value : ''}
-                                                onEditChange={handleEditChange}
-                                                onSave={saveInlineEdit}
-                                                onCancel={handleCancelEdit}
-                                                onStartEdit={startEdit}
-                                                inputRef={inlineInputRef}
-                                            />
-                                        </div>
-
-                                        {/* Added date */}
-                                        <div className="text-[12px] text-muted-foreground/40 tabular-nums">
-                                            {formatDate(client.created_at)}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </Card>
+                    <VirtualizedClientTable
+                        filtered={filtered}
+                        addingNew={addingNew}
+                        newRow={newRow}
+                        setNewRow={setNewRow}
+                        newNameRef={newNameRef}
+                        newSourceTriggerRef={newSourceTriggerRef}
+                        newSourceOpen={newSourceOpen}
+                        setNewSourceOpen={setNewSourceOpen}
+                        saveNewRow={saveNewRow}
+                        cancelAddingNew={cancelAddingNew}
+                        createClientMutation={createClientMutation}
+                        sortField={sortField}
+                        setSortField={setSortField}
+                        sortDir={sortDir}
+                        setSortDir={setSortDir}
+                        inlineEdit={inlineEdit}
+                        handleEditChange={handleEditChange}
+                        saveInlineEdit={saveInlineEdit}
+                        handleCancelEdit={handleCancelEdit}
+                        startEdit={startEdit}
+                        inlineInputRef={inlineInputRef}
+                        navigate={navigate}
+                        isDark={isDark}
+                    />
                 )}
             </div>
         </div>
