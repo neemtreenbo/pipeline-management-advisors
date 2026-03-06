@@ -3,6 +3,9 @@ export const queryKeys = {
     all: (orgId: string) => ['clients', orgId] as const,
     detail: (clientId: string) => ['clients', 'detail', clientId] as const,
     list: (orgId: string) => ['clients', 'list', orgId] as const,
+    relationships: (clientId: string) => ['clients', 'relationships', clientId] as const,
+    network: (orgId: string) => ['clients', 'network', orgId] as const,
+    networkPositions: (orgId: string, userId: string) => ['clients', 'networkPositions', orgId, userId] as const,
   },
   deals: {
     all: (orgId: string) => ['deals', orgId] as const,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Share2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
+import ClientRelationships from '@/components/clients/ClientRelationships'
+import ClientRelationshipGraph from '@/components/graph/ClientRelationshipGraph'
 
 function formatSource(src: string | null) {
     if (!src) return '—'
@@ -65,7 +67,7 @@ export default function ClientDetailPage() {
 
     // Edit state
     const [editing, setEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '' })
+    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', source: '', tags: '', birthday: '' })
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
@@ -103,6 +105,7 @@ export default function ClientDetailPage() {
                 phone: client.phone ?? '',
                 source: client.source ?? '',
                 tags: (client.tags ?? []).join(', '),
+                birthday: client.birthday ?? '',
             })
         }
     }, [client?.id])
@@ -163,6 +166,7 @@ export default function ClientDetailPage() {
             phone: editForm.phone.trim() || null,
             source: editForm.source || null,
             tags: tagsArr,
+            birthday: editForm.birthday || null,
         }).eq('id', client.id)
 
         if (error) { setSaveError(error.message); setSaving(false); return }
@@ -180,6 +184,7 @@ export default function ClientDetailPage() {
             phone: client.phone ?? '',
             source: client.source ?? '',
             tags: (client.tags ?? []).join(', '),
+            birthday: client.birthday ?? '',
         })
         setEditing(false)
         setSaveError(null)
@@ -364,6 +369,15 @@ export default function ClientDetailPage() {
                                                     <option value="other">Other</option>
                                                 </select>
                                             </div>
+                                            <div className="flex flex-col gap-1">
+                                                <Label htmlFor="edit-birthday">Birthday</Label>
+                                                <Input
+                                                    id="edit-birthday"
+                                                    type="date"
+                                                    value={editForm.birthday}
+                                                    onChange={e => setEditForm(f => ({ ...f, birthday: e.target.value }))}
+                                                />
+                                            </div>
                                             <div className="flex flex-col gap-1 sm:col-span-2">
                                                 <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
                                                 <Input
@@ -504,6 +518,10 @@ export default function ClientDetailPage() {
                                     <Activity size={14} className="mr-1.5" />
                                     Activity
                                 </TabsTrigger>
+                                <TabsTrigger value="network" id="tab-network">
+                                    <Share2 size={14} className="mr-1.5" />
+                                    Network
+                                </TabsTrigger>
                             </TabsList>
                         </div>
                     </div>
@@ -518,6 +536,7 @@ export default function ClientDetailPage() {
                                 <InfoRow label="Email" value={client.email} />
                                 <InfoRow label="Phone" value={client.phone} />
                                 <InfoRow label="Source" value={formatSource(client.source)} />
+                                <InfoRow label="Birthday" value={client.birthday ? new Date(client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null} />
                             </div>
                             <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
                                 <h3 className="text-sm font-semibold text-foreground">Record Info</h3>
@@ -552,6 +571,11 @@ export default function ClientDetailPage() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Relationships */}
+                            <div className="sm:col-span-2">
+                                <ClientRelationships clientId={clientId!} orgId={client.org_id} />
+                            </div>
                         </div>
                     </TabsContent>
 
@@ -753,6 +777,11 @@ export default function ClientDetailPage() {
                             contextDeals={contextDeals}
                         />
                     </TabsContent >
+
+                    {/* Network */}
+                    <TabsContent value="network">
+                        <ClientRelationshipGraph clientId={clientId!} orgId={client.org_id} />
+                    </TabsContent>
                 </div >
             </Tabs >
 

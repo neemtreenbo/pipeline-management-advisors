@@ -1,6 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
+import {
+  fetchClientRelationships,
+  fetchAllClientRelationships,
+  addClientRelationship,
+  removeClientRelationship,
+  fetchNetworkPositions,
+  saveNetworkPositions,
+  deleteNetworkPositions,
+  type ClientRelationType,
+  type NetworkPositions,
+} from '@/lib/clientRelationships'
 
 export interface ClientListItem {
   id: string
@@ -29,6 +40,7 @@ export interface ClientListItem {
   ai_summary: string | null
   talking_points: any
   data: Record<string, unknown> | null
+  birthday: string | null
 }
 
 export function useClients(orgId: string | undefined) {
@@ -114,5 +126,77 @@ export function useDeleteClient() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients'] })
     },
+  })
+}
+
+export function useClientRelationships(clientId: string | undefined, orgId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.clients.relationships(clientId!),
+    queryFn: () => fetchClientRelationships(clientId!, orgId!),
+    enabled: !!clientId && !!orgId,
+  })
+}
+
+export function useAddClientRelationship(clientId: string, orgId: string, userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { toClientId: string; relationType: ClientRelationType }) =>
+      addClientRelationship(orgId, clientId, input.toClientId, input.relationType, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientId) })
+    },
+  })
+}
+
+export function useRemoveClientRelationship(clientId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (linkId: string) => removeClientRelationship(linkId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.clients.relationships(clientId) })
+    },
+  })
+}
+
+export function useNetworkPositions(orgId: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.clients.networkPositions(orgId!, userId!),
+    queryFn: () => fetchNetworkPositions(orgId!, userId!),
+    enabled: !!orgId && !!userId,
+    staleTime: Infinity,
+  })
+}
+
+export function useSaveNetworkPositions(orgId: string | undefined, userId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (positions: NetworkPositions) =>
+      saveNetworkPositions(orgId!, userId!, positions),
+    onSuccess: () => {
+      if (orgId && userId) {
+        qc.invalidateQueries({ queryKey: queryKeys.clients.networkPositions(orgId, userId) })
+      }
+    },
+  })
+}
+
+export function useResetNetworkPositions(orgId: string | undefined, userId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteNetworkPositions(orgId!, userId!),
+    onSuccess: () => {
+      if (orgId && userId) {
+        qc.invalidateQueries({ queryKey: queryKeys.clients.networkPositions(orgId, userId) })
+      }
+    },
+  })
+}
+
+export function useOrgClientNetwork(orgId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.clients.network(orgId!),
+    queryFn: () => fetchAllClientRelationships(orgId!),
+    enabled: !!orgId,
+    staleTime: 60_000,
   })
 }

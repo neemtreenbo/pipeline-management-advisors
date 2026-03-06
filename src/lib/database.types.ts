@@ -58,14 +58,15 @@ export type Database = {
       clients: {
         Row: {
           ai_summary: string | null
+          birthday: string | null
           company_industry: string | null
           company_name: string | null
           company_website: string | null
           created_at: string | null
           data: Json | null
-          education: Json | null
+          education: string | null
           email: string | null
-          experiences: Json | null
+          experiences: string | null
           facebook_url: string | null
           id: string
           instagram_url: string | null
@@ -82,18 +83,19 @@ export type Database = {
           talking_points: Json | null
           tiktok_url: string | null
           updated_at: string | null
-          updates: Json | null
+          updates: string | null
         }
         Insert: {
           ai_summary?: string | null
+          birthday?: string | null
           company_industry?: string | null
           company_name?: string | null
           company_website?: string | null
           created_at?: string | null
           data?: Json | null
-          education?: Json | null
+          education?: string | null
           email?: string | null
-          experiences?: Json | null
+          experiences?: string | null
           facebook_url?: string | null
           id?: string
           instagram_url?: string | null
@@ -110,18 +112,19 @@ export type Database = {
           talking_points?: Json | null
           tiktok_url?: string | null
           updated_at?: string | null
-          updates?: Json | null
+          updates?: string | null
         }
         Update: {
           ai_summary?: string | null
+          birthday?: string | null
           company_industry?: string | null
           company_name?: string | null
           company_website?: string | null
           created_at?: string | null
           data?: Json | null
-          education?: Json | null
+          education?: string | null
           email?: string | null
-          experiences?: Json | null
+          experiences?: string | null
           facebook_url?: string | null
           id?: string
           instagram_url?: string | null
@@ -138,7 +141,7 @@ export type Database = {
           talking_points?: Json | null
           tiktok_url?: string | null
           updated_at?: string | null
-          updates?: Json | null
+          updates?: string | null
         }
         Relationships: [
           {
@@ -602,6 +605,8 @@ export type Database = {
       is_org_manager: { Args: { p_org_id: string }; Returns: boolean }
       is_org_member: { Args: { p_org_id: string }; Returns: boolean }
       is_org_non_viewer: { Args: { p_org_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
