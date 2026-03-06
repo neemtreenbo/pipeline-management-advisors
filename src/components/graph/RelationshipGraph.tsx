@@ -130,29 +130,56 @@ function RelationshipGraphInner({
       return
     }
 
-    if (savedPositions) {
-      const allHavePositions = initialNodes.every((n) => savedPositions[n.id])
-      if (allHavePositions) {
-        const positioned = initialNodes.map((n) => ({
-          ...n,
-          position: savedPositions[n.id],
-        }))
-        setNodes(positioned as Node<ClientNodeData>[])
-        setEdges(initialEdges)
-        setLayoutReady(true)
-        return
+    // Split nodes into those with saved positions and those without
+    const withPosition: Node<ClientNodeData>[] = []
+    const withoutPosition: Node<ClientNodeData>[] = []
+
+    for (const n of initialNodes) {
+      if (savedPositions?.[n.id]) {
+        withPosition.push({ ...n, position: savedPositions[n.id] })
+      } else {
+        withoutPosition.push(n)
       }
     }
 
+    if (withoutPosition.length === 0) {
+      // All nodes have saved positions — use them directly
+      setNodes(withPosition as Node<ClientNodeData>[])
+      setEdges(initialEdges)
+      setLayoutReady(true)
+      return
+    }
+
+    // Compute layout only for new nodes, then merge
     setLayoutReady(false)
-    applyElkLayout(initialNodes, initialEdges, { algorithm: layoutAlgorithm })
-      .then((laidOutNodes) => {
-        setNodes(laidOutNodes as Node<ClientNodeData>[])
+    applyElkLayout(withoutPosition, initialEdges, { algorithm: layoutAlgorithm })
+      .then((laidOutNew) => {
+        // Offset new nodes so they don't overlap existing ones
+        if (withPosition.length > 0) {
+          // Find the bounding box of existing nodes to place new ones nearby
+          let maxX = -Infinity
+          for (const n of withPosition) {
+            if (n.position.x > maxX) maxX = n.position.x
+          }
+          for (const n of laidOutNew) {
+            n.position.x += maxX + 250
+          }
+        }
+        setNodes([...withPosition, ...laidOutNew] as Node<ClientNodeData>[])
         setEdges(initialEdges)
         setLayoutReady(true)
       })
       .catch(() => {
-        setNodes(initialNodes)
+        // Fallback: place new nodes with offset
+        let maxX = -Infinity
+        for (const n of withPosition) {
+          if (n.position.x > maxX) maxX = n.position.x
+        }
+        const fallback = withoutPosition.map((n, i) => ({
+          ...n,
+          position: { x: maxX + 250, y: i * 80 },
+        }))
+        setNodes([...withPosition, ...fallback] as Node<ClientNodeData>[])
         setEdges(initialEdges)
         setLayoutReady(true)
       })

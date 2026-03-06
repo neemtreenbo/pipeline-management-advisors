@@ -122,19 +122,36 @@ export interface NetworkPositions {
   [nodeId: string]: { x: number; y: number }
 }
 
-export async function fetchNetworkPositions(
+export interface NetworkLayoutData {
+  positions: NetworkPositions | null
+  pinnedClientIds: string[]
+}
+
+export async function fetchNetworkLayout(
   orgId: string,
   userId: string
-): Promise<NetworkPositions | null> {
+): Promise<NetworkLayoutData> {
   const { data, error } = await supabase
     .from('network_positions')
-    .select('positions')
+    .select('positions, pinned_client_ids')
     .eq('org_id', orgId)
     .eq('user_id', userId)
     .maybeSingle()
 
   if (error) throw error
-  return (data?.positions as NetworkPositions) ?? null
+  return {
+    positions: (data?.positions as NetworkPositions) ?? null,
+    pinnedClientIds: (data?.pinned_client_ids as string[]) ?? [],
+  }
+}
+
+/** @deprecated Use fetchNetworkLayout instead */
+export async function fetchNetworkPositions(
+  orgId: string,
+  userId: string
+): Promise<NetworkPositions | null> {
+  const layout = await fetchNetworkLayout(orgId, userId)
+  return layout.positions
 }
 
 export async function saveNetworkPositions(
@@ -146,6 +163,20 @@ export async function saveNetworkPositions(
     .from('network_positions')
     .upsert(
       { org_id: orgId, user_id: userId, positions, updated_at: new Date().toISOString() },
+      { onConflict: 'org_id,user_id' }
+    )
+  if (error) throw error
+}
+
+export async function savePinnedClientIds(
+  orgId: string,
+  userId: string,
+  pinnedClientIds: string[]
+): Promise<void> {
+  const { error } = await supabase
+    .from('network_positions')
+    .upsert(
+      { org_id: orgId, user_id: userId, pinned_client_ids: pinnedClientIds, updated_at: new Date().toISOString() },
       { onConflict: 'org_id,user_id' }
     )
   if (error) throw error

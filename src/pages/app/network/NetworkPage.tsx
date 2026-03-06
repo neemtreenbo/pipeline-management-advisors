@@ -1,15 +1,18 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import { Plus, RotateCcw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import type { Node } from '@xyflow/react'
 import { useOrg } from '@/contexts/OrgContext'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   useOrgClientNetwork,
-  useNetworkPositions,
+  useClients,
+  useNetworkLayout,
   useSaveNetworkPositions,
+  useSavePinnedClients,
   useResetNetworkPositions,
 } from '@/hooks/queries/useClients'
-import { useOrgGraphData } from '@/hooks/useGraphData'
+import { useOrgGraphData, type ClientNodeData } from '@/hooks/useGraphData'
 import { addClientRelationship, removeClientRelationship, type ClientRelationType, type NetworkPositions } from '@/lib/clientRelationships'
 import { queryKeys } from '@/lib/queryKeys'
 import RelationshipGraph from '@/components/graph/RelationshipGraph'
@@ -19,12 +22,41 @@ export default function NetworkPage() {
   const { orgId } = useOrg()
   const { user } = useAuth()
   const qc = useQueryClient()
-  const { data, isLoading, isError } = useOrgClientNetwork(orgId ?? undefined)
-  const { nodes, edges } = useOrgGraphData(data)
+  const { data: networkData, isLoading: networkLoading, isError } = useOrgClientNetwork(orgId ?? undefined)
+  const { data: allClients = [] } = useClients(orgId ?? undefined)
+  const { nodes: relationshipNodes, edges } = useOrgGraphData(networkData)
 
-  const { data: savedPositions } = useNetworkPositions(orgId ?? undefined, user?.id)
+  const { data: layoutData } = useNetworkLayout(orgId ?? undefined, user?.id)
+  const savedPositions = layoutData?.positions ?? null
+  const pinnedClientIds = layoutData?.pinnedClientIds ?? []
+
   const savePositions = useSaveNetworkPositions(orgId ?? undefined, user?.id)
+  const savePinned = useSavePinnedClients(orgId ?? undefined, user?.id)
   const resetPositions = useResetNetworkPositions(orgId ?? undefined, user?.id)
+
+  // Merge pinned standalone clients into graph nodes
+  const nodes = useMemo(() => {
+    const existingIds = new Set(relationshipNodes.map((n) => n.id))
+    const clientMap = new Map(allClients.map((c) => [c.id, c]))
+
+    const pinnedNodes: Node<ClientNodeData>[] = pinnedClientIds
+      .filter((id) => !existingIds.has(id) && clientMap.has(id))
+      .map((id) => {
+        const c = clientMap.get(id)!
+        return {
+          id: c.id,
+          type: 'clientNode' as const,
+          position: { x: 0, y: 0 },
+          data: {
+            clientId: c.id,
+            name: c.name,
+            profilePictureUrl: c.profile_picture_url,
+          },
+        }
+      })
+
+    return [...relationshipNodes, ...pinnedNodes]
+  }, [relationshipNodes, pinnedClientIds, allClients])
 
   // Floating "+" button popover state
   const [showAddPopover, setShowAddPopover] = useState(false)
@@ -54,6 +86,7 @@ export default function NetworkPage() {
     async (clientId: string, relationType: ClientRelationType | null, sourceNodeId: string | null) => {
       if (!orgId || !user) return
       if (sourceNodeId && relationType) {
+        // Connecting from a node — create relationship
         try {
           await addClientRelationship(orgId, sourceNodeId, clientId, relationType, user.id)
           invalidateNetwork(sourceNodeId, clientId)
@@ -61,11 +94,12 @@ export default function NetworkPage() {
           // silently fail
         }
       } else {
-        // Adding standalone node — just invalidate to refetch (node will appear if it has any relationships)
-        invalidateNetwork()
+        // Adding standalone node — pin the client
+        const newPinned = [...new Set([...pinnedClientIds, clientId])]
+        savePinned.mutate(newPinned)
       }
     },
-    [orgId, user]
+    [orgId, user, pinnedClientIds, savePinned]
   )
 
   const handleAddStandaloneClient = useCallback(
@@ -100,7 +134,7 @@ export default function NetworkPage() {
     resetPositions.mutate()
   }
 
-  if (isLoading) {
+  if (networkLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin" />
@@ -151,9 +185,9 @@ export default function NetworkPage() {
       <div className="flex-1 px-6 pb-6 min-h-0 relative">
         {nodes.length === 0 ? (
           <div className="h-full rounded-xl border border-border bg-background flex flex-col items-center justify-center gap-3">
-            <p className="text-sm font-medium text-foreground">No relationships yet</p>
+            <p className="text-sm font-medium text-foreground">No clients on the board yet</p>
             <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Click the + button to add your first client, then drag from the handle dots to connect them.
+              Click the + button to add clients, then drag from the handle dots to connect them.
             </p>
           </div>
         ) : (

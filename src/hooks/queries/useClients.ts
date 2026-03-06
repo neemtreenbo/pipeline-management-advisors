@@ -6,8 +6,9 @@ import {
   fetchAllClientRelationships,
   addClientRelationship,
   removeClientRelationship,
-  fetchNetworkPositions,
+  fetchNetworkLayout,
   saveNetworkPositions,
+  savePinnedClientIds,
   deleteNetworkPositions,
   type ClientRelationType,
   type NetworkPositions,
@@ -158,10 +159,10 @@ export function useRemoveClientRelationship(clientId: string) {
   })
 }
 
-export function useNetworkPositions(orgId: string | undefined, userId: string | undefined) {
+export function useNetworkLayout(orgId: string | undefined, userId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.clients.networkPositions(orgId!, userId!),
-    queryFn: () => fetchNetworkPositions(orgId!, userId!),
+    queryFn: () => fetchNetworkLayout(orgId!, userId!),
     enabled: !!orgId && !!userId,
     staleTime: Infinity,
   })
@@ -172,6 +173,19 @@ export function useSaveNetworkPositions(orgId: string | undefined, userId: strin
   return useMutation({
     mutationFn: (positions: NetworkPositions) =>
       saveNetworkPositions(orgId!, userId!, positions),
+    onSuccess: () => {
+      if (orgId && userId) {
+        qc.invalidateQueries({ queryKey: queryKeys.clients.networkPositions(orgId, userId) })
+      }
+    },
+  })
+}
+
+export function useSavePinnedClients(orgId: string | undefined, userId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (pinnedClientIds: string[]) =>
+      savePinnedClientIds(orgId!, userId!, pinnedClientIds),
     onSuccess: () => {
       if (orgId && userId) {
         qc.invalidateQueries({ queryKey: queryKeys.clients.networkPositions(orgId, userId) })
