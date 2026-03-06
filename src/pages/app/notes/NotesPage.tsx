@@ -13,8 +13,8 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[] }) {
-    const [isExpanded, setIsExpanded] = useState(true)
+const ClientNoteGroup = memo(function ClientNoteGroup({ clientId, clientName, profilePictureUrl, notes, defaultExpanded = false }: { clientId: string, clientName: string, profilePictureUrl: string | null, notes: Note[], defaultExpanded?: boolean }) {
+    const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
     return (
         <div className="mb-8 last:mb-0">
@@ -190,8 +190,8 @@ export default function NotesPage() {
         }, {} as Record<string, { id: string, name: string, profilePictureUrl: string | null, notes: Note[] }>)
 
         return Object.values(grouped).sort((a, b) => {
-            if (a.id === 'unassigned') return 1
-            if (b.id === 'unassigned') return -1
+            if (a.id === 'unassigned') return -1
+            if (b.id === 'unassigned') return 1
             return a.name.localeCompare(b.name)
         })
     }, [notes, noteClients])
@@ -200,12 +200,12 @@ export default function NotesPage() {
         <div className="min-h-screen bg-transparent pt-6">
             <div className="max-w-5xl mx-auto px-6 pb-8">
 
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-lg font-semibold text-foreground">Notes</h1>
-                        <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
-                            <Plus size={14} className="mr-1.5" /> Add
-                        </Button>
-                    </div>
+                <div className="flex items-center justify-between mb-6 h-8">
+                    <h1 className="text-lg font-semibold text-foreground leading-none">Notes</h1>
+                    <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
+                        <Plus size={14} className="mr-1.5" /> Add
+                    </Button>
+                </div>
 
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -229,8 +229,8 @@ export default function NotesPage() {
                         </div>
                     ) : (
                         <div className="flex flex-col">
-                            {sortedGroups.map((group) => (
-                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} />
+                            {sortedGroups.map((group, i) => (
+                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0} />
                             ))}
 
                             {hasMore && (

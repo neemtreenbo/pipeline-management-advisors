@@ -171,12 +171,12 @@ export default function TasksPage() {
     return (
         <div className="min-h-screen bg-transparent pt-6">
             <div className="max-w-5xl mx-auto px-6 pb-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-lg font-semibold text-foreground">Tasks</h1>
-                        <Button onClick={openInlineAdd} className="h-8 text-xs rounded-full px-3 font-medium">
-                            <Plus size={14} className="mr-1.5" /> Add
-                        </Button>
-                    </div>
+                <div className="flex items-center justify-between mb-6 h-8">
+                    <h1 className="text-lg font-semibold text-foreground leading-none">Tasks</h1>
+                    <Button onClick={openInlineAdd} className="h-8 text-xs rounded-full px-3 font-medium">
+                        <Plus size={14} className="mr-1.5" /> Add
+                    </Button>
+                </div>
 
                     {/* View tabs */}
                     <Tabs value={view} onValueChange={(v) => setView(v as ViewType)} className="self-start">

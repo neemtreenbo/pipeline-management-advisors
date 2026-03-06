@@ -3,9 +3,11 @@ import { Plus } from 'lucide-react'
 import { Droppable } from '@hello-pangea/dnd'
 import { AnimatePresence } from 'framer-motion'
 import type { Deal, DealStage, NewDealInput, StageTransition } from '@/lib/deals'
+import { useTheme } from '@/contexts/ThemeContext'
 
 import DealCard from './DealCard'
 import InlineAddDeal from './InlineAddDeal'
+import ClientAvatar from './ClientAvatar'
 import { STAGE_COLORS } from './stageColors'
 
 interface AttachmentCounts {
@@ -22,16 +24,6 @@ interface KanbanColumnProps {
     onDealDeleted?: (dealId: string) => void
 }
 
-function getInitials(name: string): string {
-    return name
-        .split(' ')
-        .map((w) => w[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-}
-
 interface ClientGroup {
     clientId: string
     clientName: string
@@ -41,7 +33,6 @@ interface ClientGroup {
 
 function groupDealsByClient(deals: Deal[]): ClientGroup[] {
     const map = new Map<string, ClientGroup>()
-    // Build a flat index to preserve drag indices
     deals.forEach((deal) => {
         const cid = deal.client_id ?? 'unknown'
         if (!map.has(cid)) {
@@ -67,6 +58,8 @@ export default memo(function KanbanColumn({
     onDealDeleted,
 }: KanbanColumnProps) {
     const [isAdding, setIsAdding] = useState(false)
+    const { theme } = useTheme()
+    const isDark = theme === 'dark'
     const clientGroups = useMemo(() => groupDealsByClient(deals), [deals])
 
     // Build a flat index map for Draggable indices (must be sequential within droppable)
@@ -91,7 +84,7 @@ export default memo(function KanbanColumn({
                 <div className="flex items-center gap-2">
                     <span
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: document.documentElement.classList.contains('dark') ? STAGE_COLORS[stage].bgDark : STAGE_COLORS[stage].bg }}
+                        style={{ backgroundColor: isDark ? STAGE_COLORS[stage].bgDark : STAGE_COLORS[stage].bg }}
                     />
                     <span className="text-sm font-medium text-foreground dark:text-foreground/80 tracking-wide">
                         {stage}
@@ -142,19 +135,11 @@ export default memo(function KanbanColumn({
                             <div key={group.clientId} className="flex flex-col gap-1.5">
                                 {/* Client header */}
                                 <div className="flex items-center gap-2 px-1 pt-1">
-                                    {group.profilePictureUrl ? (
-                                        <img
-                                            src={group.profilePictureUrl}
-                                            alt={group.clientName}
-                                            className="w-5 h-5 rounded-full object-cover shrink-0"
-                                        />
-                                    ) : (
-                                        <div className="w-5 h-5 rounded-full bg-muted-foreground/25 dark:bg-muted-foreground/15 flex items-center justify-center shrink-0">
-                                            <span className="text-[9px] font-semibold text-muted-foreground dark:text-muted-foreground/70 leading-none">
-                                                {getInitials(group.clientName)}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <ClientAvatar
+                                        name={group.clientName}
+                                        profilePictureUrl={group.profilePictureUrl}
+                                        size="sm"
+                                    />
                                     <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground/70 truncate">
                                         {group.clientName}
                                     </span>

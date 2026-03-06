@@ -8,33 +8,19 @@ import {
     logDealActivity,
 } from '@/lib/deals'
 import type { Deal, DealStage } from '@/lib/deals'
+import { formatCurrency } from '@/lib/format'
 import { getDealIcon } from './DealIcon'
 import DealDetailsModal from './DealDetailsModal'
-
-const PLAN_TYPES = [
-    'Retirement Plan',
-    'Education Plan',
-    'Income Protection Plan',
-    'Health Protection Plan',
-    'Critical Illness Plan',
-    'Investment Plan',
-    'Estate Plan',
-    'Legacy Plan',
-]
+import { PLAN_TYPE_VALUES } from './planTypes'
 
 interface InlineDealsListProps {
     clientId: string
     orgId: string
 }
 
-function formatValue(value: number) {
-    if (!value) return null
-    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
-}
-
 const DealItem = memo(function DealItem({ deal, onSelect }: { deal: Deal; onSelect: (id: string) => void }) {
     const dealTitle = (deal.data as Record<string, string>)?.title || '—'
-    const formattedValue = formatValue(deal.value)
+    const formattedValue = formatCurrency(deal.value)
     return (
         <button
             type="button"
@@ -138,7 +124,7 @@ export default function InlineDealsList({ clientId, orgId }: InlineDealsListProp
                     <div className="flex flex-col gap-3 bg-card border border-border/60 rounded-xl px-4 py-3">
                         {/* Plan type pills */}
                         <div className="flex flex-wrap gap-1.5">
-                            {PLAN_TYPES.map((plan) => (
+                            {PLAN_TYPE_VALUES.map((plan) => (
                                 <button
                                     key={plan}
                                     type="button"

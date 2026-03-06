@@ -7,17 +7,7 @@ import type { DealStage, NewDealInput } from '@/lib/deals'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ClientSelector from '@/components/ui/ClientSelector'
-
-const FINANCIAL_PLAN_TYPES = [
-    'Retirement Plan',
-    'Education Plan',
-    'Income Protection Plan',
-    'Health Protection Plan',
-    'Critical Illness Plan',
-    'Investment Plan',
-    'Estate Plan',
-    'Legacy Plan',
-]
+import { PLAN_TYPE_VALUES } from './planTypes'
 
 interface NewDealModalProps {
     orgId: string
@@ -121,7 +111,7 @@ export default function NewDealModal({ orgId, defaultStage = 'Opportunity', onCl
                         <div className="flex flex-col gap-1.5">
                             <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Plan Type</span>
                             <div className="flex flex-wrap gap-1.5 mb-1">
-                                {FINANCIAL_PLAN_TYPES.map((plan) => {
+                                {PLAN_TYPE_VALUES.map((plan) => {
                                     const isSelected = form.title === plan
                                     return (
                                         <motion.button
