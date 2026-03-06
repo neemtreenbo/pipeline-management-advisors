@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Share2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
@@ -518,9 +518,9 @@ export default function ClientDetailPage() {
                                     <Activity size={14} className="mr-1.5" />
                                     Activity
                                 </TabsTrigger>
-                                <TabsTrigger value="network" id="tab-network">
-                                    <Share2 size={14} className="mr-1.5" />
-                                    Network
+                                <TabsTrigger value="mindmap" id="tab-mindmap">
+                                    <Brain size={14} className="mr-1.5" />
+                                    Mindmap
                                 </TabsTrigger>
                             </TabsList>
                         </div>
@@ -778,9 +778,9 @@ export default function ClientDetailPage() {
                         />
                     </TabsContent >
 
-                    {/* Network */}
-                    <TabsContent value="network">
-                        <ClientRelationshipGraph clientId={clientId!} orgId={client.org_id} />
+                    {/* Mindmap */}
+                    <TabsContent value="mindmap">
+                        <ClientRelationshipGraph clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
                     </TabsContent>
                 </div >
             </Tabs >

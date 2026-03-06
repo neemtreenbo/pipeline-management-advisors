@@ -7,9 +7,10 @@ export interface ClientNodeData extends Record<string, unknown> {
   name: string
   profilePictureUrl: string | null
   isFocused?: boolean
+  connectionCount?: number
 }
 
-const RELATION_COLORS: Record<ClientRelationType, string> = {
+export const RELATION_COLORS: Record<ClientRelationType, string> = {
   spouse: '#0A84FF',
   family: '#30D158',
   child: '#FF9F0A',
@@ -32,7 +33,8 @@ function buildEdge(e: OrgNetworkData['edges'][number]): Edge {
     source: e.fromId,
     target: e.toId,
     label: RELATION_LABELS[e.relationType] ?? e.relationType,
-    type: 'default',
+    type: 'smoothstep',
+    data: { relationType: e.relationType },
     style: { stroke: color, strokeWidth: 2, opacity: 0.7 },
     labelStyle: { fontSize: 9, fill: color, fontWeight: 600, letterSpacing: '0.03em' },
     labelBgStyle: { fill: 'hsl(var(--background))', fillOpacity: 0.9 },
@@ -47,6 +49,13 @@ export function useOrgGraphData(
   return useMemo(() => {
     if (!data) return { nodes: [], edges: [] }
 
+    // Count connections per client
+    const degree = new Map<string, number>()
+    for (const e of data.edges) {
+      degree.set(e.fromId, (degree.get(e.fromId) ?? 0) + 1)
+      degree.set(e.toId, (degree.get(e.toId) ?? 0) + 1)
+    }
+
     const nodes: Node<ClientNodeData>[] = data.clients.map((c) => ({
       id: c.id,
       type: 'clientNode',
@@ -55,6 +64,7 @@ export function useOrgGraphData(
         clientId: c.id,
         name: c.name,
         profilePictureUrl: c.profile_picture_url,
+        connectionCount: degree.get(c.id) ?? 0,
       },
     }))
 
@@ -83,6 +93,13 @@ export function useClientGraphData(
 
     const clientMap = new Map(data.clients.map((c) => [c.id, c]))
 
+    // Count connections for each node in this subgraph
+    const degree = new Map<string, number>()
+    for (const e of relevantEdges) {
+      degree.set(e.fromId, (degree.get(e.fromId) ?? 0) + 1)
+      degree.set(e.toId, (degree.get(e.toId) ?? 0) + 1)
+    }
+
     const nodes: Node<ClientNodeData>[] = Array.from(connectedIds)
       .filter((id) => clientMap.has(id))
       .map((id) => {
@@ -96,6 +113,7 @@ export function useClientGraphData(
             name: c.name,
             profilePictureUrl: c.profile_picture_url,
             isFocused: c.id === focusClientId,
+            connectionCount: degree.get(c.id) ?? 0,
           },
         }
       })

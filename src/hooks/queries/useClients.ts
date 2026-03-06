@@ -110,7 +110,23 @@ export function useUpdateClient() {
       const { error } = await supabase.from('clients').update(patch).eq('id', id)
       if (error) throw error
     },
-    onSuccess: (_data, variables) => {
+    onMutate: async ({ id, ...patch }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: queryKeys.clients.detail(id) })
+      const previous = qc.getQueryData(queryKeys.clients.detail(id))
+      // Optimistically merge the patch into the cached client
+      if (previous) {
+        qc.setQueryData(queryKeys.clients.detail(id), { ...previous as object, ...patch })
+      }
+      return { previous, id }
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on error
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.clients.detail(context.id), context.previous)
+      }
+    },
+    onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.clients.detail(variables.id) })
       qc.invalidateQueries({ queryKey: ['clients'] })
     },

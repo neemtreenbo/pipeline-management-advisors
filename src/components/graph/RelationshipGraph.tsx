@@ -15,13 +15,45 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import ClientNode from './ClientNode'
+import EntityNode from './EntityNode'
+import GroupNode from './GroupNode'
 import ConnectionTypePopover from './ConnectionTypePopover'
 import AddClientPopover from './AddClientPopover'
 import type { ClientNodeData } from '@/hooks/useGraphData'
-import { applyElkLayout } from '@/lib/graphLayout'
+import { applyElkLayout, placeNewNodesInSlots, type LayoutEdge } from '@/lib/graphLayout'
 import type { NetworkPositions, ClientRelationType } from '@/lib/clientRelationships'
 
-const NODE_TYPES = { clientNode: ClientNode }
+const NODE_TYPES = { clientNode: ClientNode, entityNode: EntityNode, groupNode: GroupNode }
+
+/**
+ * For each edge, pick the handle (top/right/bottom/left) on source and target
+ * based on the relative position of the two connected nodes.
+ */
+function assignEdgeHandles(edges: Edge[], nodePositions: Map<string, { x: number; y: number }>): Edge[] {
+  return edges.map((edge) => {
+    const srcPos = nodePositions.get(edge.source)
+    const tgtPos = nodePositions.get(edge.target)
+    if (!srcPos || !tgtPos) return edge
+
+    const dx = tgtPos.x - srcPos.x
+    const dy = tgtPos.y - srcPos.y
+
+    // Pick side based on dominant direction from source → target
+    let sourceHandle: string
+    let targetHandle: string
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal dominant
+      sourceHandle = dx > 0 ? 'right' : 'left'
+      targetHandle = dx > 0 ? 'left' : 'right'
+    } else {
+      // Vertical dominant
+      sourceHandle = dy > 0 ? 'bottom' : 'top'
+      targetHandle = dy > 0 ? 'top' : 'bottom'
+    }
+
+    return { ...edge, sourceHandle, targetHandle }
+  })
+}
 
 function DeleteEdgePopover({
   x,
@@ -130,6 +162,13 @@ function RelationshipGraphInner({
       return
     }
 
+    // Convert xyflow edges to layout edges with relationType
+    const layoutEdges: LayoutEdge[] = initialEdges.map((e) => ({
+      source: e.source,
+      target: e.target,
+      relationType: (e.data as Record<string, unknown>)?.relationType as string ?? '',
+    }))
+
     // Split nodes into those with saved positions and those without
     const withPosition: Node<ClientNodeData>[] = []
     const withoutPosition: Node<ClientNodeData>[] = []
@@ -142,47 +181,41 @@ function RelationshipGraphInner({
       }
     }
 
+    // Helper: build position map and set nodes + edges with handle assignments
+    const applyLayout = (layoutNodes: Node<ClientNodeData>[]) => {
+      const posMap = new Map<string, { x: number; y: number }>()
+      for (const n of layoutNodes) posMap.set(n.id, n.position)
+      setNodes(layoutNodes)
+      setEdges(assignEdgeHandles(initialEdges, posMap))
+      setLayoutReady(true)
+    }
+
     if (withoutPosition.length === 0) {
       // All nodes have saved positions — use them directly
-      setNodes(withPosition as Node<ClientNodeData>[])
-      setEdges(initialEdges)
-      setLayoutReady(true)
+      applyLayout(withPosition as Node<ClientNodeData>[])
       return
     }
 
-    // Compute layout only for new nodes, then merge
-    setLayoutReady(false)
-    applyElkLayout(withoutPosition, initialEdges, { algorithm: layoutAlgorithm })
-      .then((laidOutNew) => {
-        // Offset new nodes so they don't overlap existing ones
-        if (withPosition.length > 0) {
-          // Find the bounding box of existing nodes to place new ones nearby
-          let maxX = -Infinity
-          for (const n of withPosition) {
-            if (n.position.x > maxX) maxX = n.position.x
-          }
-          for (const n of laidOutNew) {
-            n.position.x += maxX + 250
-          }
-        }
-        setNodes([...withPosition, ...laidOutNew] as Node<ClientNodeData>[])
-        setEdges(initialEdges)
-        setLayoutReady(true)
-      })
-      .catch(() => {
-        // Fallback: place new nodes with offset
-        let maxX = -Infinity
-        for (const n of withPosition) {
-          if (n.position.x > maxX) maxX = n.position.x
-        }
-        const fallback = withoutPosition.map((n, i) => ({
-          ...n,
-          position: { x: maxX + 250, y: i * 80 },
-        }))
-        setNodes([...withPosition, ...fallback] as Node<ClientNodeData>[])
-        setEdges(initialEdges)
-        setLayoutReady(true)
-      })
+    if (withPosition.length === 0) {
+      // All nodes are new — full cluster layout
+      setLayoutReady(false)
+      applyElkLayout(withoutPosition, layoutEdges, { algorithm: layoutAlgorithm })
+        .then((laidOut) => {
+          applyLayout(laidOut as Node<ClientNodeData>[])
+        })
+        .catch(() => {
+          const fallback = withoutPosition.map((n, i) => ({
+            ...n,
+            position: { x: (i % 4) * 220, y: Math.floor(i / 4) * 120 },
+          }))
+          applyLayout(fallback as Node<ClientNodeData>[])
+        })
+      return
+    }
+
+    // Place new nodes in slots near their connections
+    const placed = placeNewNodesInSlots(withoutPosition, withPosition, layoutEdges)
+    applyLayout([...withPosition, ...placed] as Node<ClientNodeData>[])
   }, [initialNodes, initialEdges, layoutAlgorithm, savedPositions])
 
   const handleNodesChange = useCallback(
@@ -359,15 +392,17 @@ function RelationshipGraphInner({
             borderRadius: '0.75rem',
           }}
         />
-        <MiniMap
-          nodeColor="hsl(var(--muted))"
-          maskColor="hsla(var(--background), 0.7)"
-          style={{
-            background: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '0.75rem',
-          }}
-        />
+        {interactive && (
+          <MiniMap
+            nodeColor="hsl(var(--muted))"
+            maskColor="hsla(var(--background), 0.7)"
+            style={{
+              background: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '0.75rem',
+            }}
+          />
+        )}
       </ReactFlow>
 
       {/* Popovers rendered on top of the graph */}
