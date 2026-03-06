@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { supabase } from '@/lib/supabase'
 import {
   getNotesByOrgPaginated, getNoteById, createNote, updateNote,
   deleteNote, getNotesLinkedToEntity, getClientsForNotes,
@@ -13,6 +14,31 @@ export function useNotesPaginated(orgId: string | undefined, pageSize = 24) {
     queryFn: ({ pageParam }) => getNotesByOrgPaginated(orgId!, pageSize, pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
+    enabled: !!orgId,
+  })
+}
+
+export function useAllNotes(orgId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notes.all(orgId!),
+    queryFn: async () => {
+      const PAGE_SIZE = 1000
+      let allData: Note[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('org_id', orgId!)
+          .order('updated_at', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw error
+        allData = allData.concat((data ?? []) as Note[])
+        if (!data || data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+      return allData
+    },
     enabled: !!orgId,
   })
 }

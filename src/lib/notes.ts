@@ -337,15 +337,22 @@ export type NoteClientInfo = {
 export async function getClientsForNotes(noteIds: string[]): Promise<NoteClientInfo[]> {
     if (!noteIds.length) return []
 
-    // Fetch direct client links and deal links
-    const { data: links } = await supabase
-        .from('links')
-        .select('from_id, to_id, to_type')
-        .eq('from_type', 'note')
-        .in('from_id', noteIds)
-        .in('to_type', ['client', 'deal'])
+    // Batch the in() filter to avoid Supabase URL length limits
+    const BATCH = 300
+    const allLinks: { from_id: string; to_id: string; to_type: string }[] = []
+    for (let i = 0; i < noteIds.length; i += BATCH) {
+        const batch = noteIds.slice(i, i + BATCH)
+        const { data } = await supabase
+            .from('links')
+            .select('from_id, to_id, to_type')
+            .eq('from_type', 'note')
+            .in('from_id', batch)
+            .in('to_type', ['client', 'deal'])
+        if (data) allLinks.push(...data)
+    }
+    const links = allLinks
 
-    if (!links || links.length === 0) return []
+    if (links.length === 0) return []
 
     const clientLinks = links.filter(l => l.to_type === 'client')
     const dealLinks = links.filter(l => l.to_type === 'deal')

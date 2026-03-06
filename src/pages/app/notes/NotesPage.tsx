@@ -1,15 +1,16 @@
 import { useState, useCallback, useMemo, memo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, FileText, Search } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { ACCENT_PALETTE, getAccentBg } from '@/lib/colors'
 import { createNote } from '@/lib/notes'
 import type { Note, NoteClientInfo } from '@/lib/notes'
-import { useNotesPaginated, useNoteClientInfo } from '@/hooks/queries/useNotes'
+import { useAllNotes, useNoteClientInfo } from '@/hooks/queries/useNotes'
 import { extractTextFromContent } from '@/lib/extract-text'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 const PALETTE_CYCLE = [
     ACCENT_PALETTE.blue,
@@ -101,18 +102,7 @@ export default function NotesPage() {
     const { orgId } = useOrg()
     const navigate = useNavigate()
 
-    const {
-        data: paginatedData,
-        isLoading: loading,
-        hasNextPage: hasMore,
-        isFetchingNextPage: loadingMore,
-        fetchNextPage,
-    } = useNotesPaginated(orgId ?? undefined)
-
-    const notes = useMemo(
-        () => paginatedData?.pages.flatMap(p => p.notes) ?? [],
-        [paginatedData]
-    )
+    const { data: notes = [], isLoading: loading } = useAllNotes(orgId ?? undefined)
 
     const noteIds = useMemo(() => notes.map(n => n.id), [notes])
     const { data: clientInfoList = [] } = useNoteClientInfo(noteIds)
@@ -122,10 +112,6 @@ export default function NotesPage() {
         clientInfoList.forEach(c => { map[c.noteId] = c })
         return map
     }, [clientInfoList])
-
-    const loadMore = useCallback(() => {
-        if (hasMore && !loadingMore) fetchNextPage()
-    }, [hasMore, loadingMore, fetchNextPage])
 
     const handleCreateNote = useCallback(async () => {
         if (!orgId || !user) return
@@ -137,8 +123,21 @@ export default function NotesPage() {
         }
     }, [orgId, user, navigate])
 
+    const [searchQuery, setSearchQuery] = useState('')
+
     const sortedGroups = useMemo(() => {
-        const grouped = notes.reduce((acc, note) => {
+        const q = searchQuery.toLowerCase().trim()
+
+        const filtered = q
+            ? notes.filter(note => {
+                const title = (note.title || '').toLowerCase()
+                const clientInfo = noteClients[note.id]
+                const clientName = clientInfo ? clientInfo.clientName.toLowerCase() : ''
+                return title.includes(q) || clientName.includes(q)
+            })
+            : notes
+
+        const grouped = filtered.reduce((acc, note) => {
             const clientInfo = noteClients[note.id]
             const groupKey = clientInfo ? clientInfo.clientId : 'unassigned'
             const groupName = clientInfo ? clientInfo.clientName : 'Standalone Notes'
@@ -156,17 +155,40 @@ export default function NotesPage() {
             if (b.id === 'unassigned') return 1
             return a.name.localeCompare(b.name)
         })
-    }, [notes, noteClients])
+    }, [notes, noteClients, searchQuery])
 
     return (
-        <div className="min-h-screen bg-transparent pt-6">
+        <div className="min-h-screen bg-transparent">
             <div className="max-w-5xl mx-auto px-6 pb-8">
 
-                <div className="flex items-center justify-between mb-6 h-8">
-                    <h1 className="text-lg font-semibold text-foreground leading-none">Notes</h1>
-                    <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
-                        <Plus size={14} className="mr-1.5" /> Add
-                    </Button>
+                <div className="sticky top-0 z-20 bg-background pt-6 pb-5">
+                    <div className="flex items-center justify-between h-8">
+                        <h1 className="text-lg font-semibold text-foreground leading-none flex items-center gap-2">
+                            Notes
+                            {!loading && notes.length > 0 && (
+                                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-normal bg-muted text-muted-foreground">
+                                    {searchQuery.trim() ? `${sortedGroups.reduce((s, g) => s + g.notes.length, 0)} / ${notes.length}` : notes.length}
+                                </span>
+                            )}
+                        </h1>
+                        <Button onClick={handleCreateNote} className="h-8 text-xs rounded-full px-3 font-medium">
+                            <Plus size={14} className="mr-1.5" /> Add
+                        </Button>
+                    </div>
+
+                    {!loading && notes.length > 0 && (
+                        <div className="mt-5">
+                            <div className="relative max-w-sm">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
+                                <Input
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Search notes..."
+                                    className="h-8 pl-8 text-sm rounded-lg"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                     {loading ? (
@@ -176,6 +198,7 @@ export default function NotesPage() {
                             ))}
                         </div>
                     ) : notes.length === 0 ? (
+                        /* No notes at all */
                         <div className="flex flex-col items-center justify-center py-24 text-center">
                             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                                 <FileText size={24} className="text-muted-foreground" />
@@ -189,24 +212,26 @@ export default function NotesPage() {
                                     Draft a note
                             </Button>
                         </div>
+                    ) : sortedGroups.length === 0 && searchQuery.trim() ? (
+                        /* Search returned no results */
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <Search size={20} className="text-muted-foreground/30 mb-3" />
+                            <p className="text-sm font-medium text-foreground mb-1">No matching notes</p>
+                            <p className="text-[13px] text-muted-foreground/60">
+                                Try adjusting your search.
+                            </p>
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="text-[13px] text-accent hover:text-accent/80 mt-3 transition-colors"
+                            >
+                                Clear search
+                            </button>
+                        </div>
                     ) : (
                         <div className="flex flex-col">
                             {sortedGroups.map((group, i) => (
                                 <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0} colorIndex={i} />
                             ))}
-
-                            {hasMore && (
-                                <div className="flex justify-center pt-4 pb-2">
-                                    <Button
-                                        variant="secondary"
-                                        onClick={loadMore}
-                                        disabled={loadingMore}
-                                        className="h-8 text-xs rounded-full px-5 font-medium"
-                                    >
-                                        {loadingMore ? 'Loading…' : 'Load more'}
-                                    </Button>
-                                </div>
-                            )}
                         </div>
                     )}
             </div>
