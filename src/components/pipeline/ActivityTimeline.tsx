@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Activity } from 'lucide-react'
 
-interface ActivityRecord {
+export interface ActivityRecord {
     id: string
     event_type: string
     entity_type?: string

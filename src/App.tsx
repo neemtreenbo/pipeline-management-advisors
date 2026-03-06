@@ -10,6 +10,7 @@ import PipelinePage from './pages/app/pipeline/PipelinePage'
 import TasksPage from './pages/app/tasks/TasksPage'
 import NotesPage from './pages/app/notes/NotesPage'
 import NoteDetailPage from './pages/app/notes/NoteDetailPage'
+import RulesPage from './pages/app/settings/RulesPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="tasks" element={<TasksPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="notes/:noteId" element={<NoteDetailPage />} />
+        <Route path="settings/rules" element={<RulesPage />} />
       </Route>
 
       {/* Catch-all */}
