@@ -153,7 +153,7 @@ const [hoveredPath, setHoveredPath] = useState<string | null>(null)
                                 {isActive && (
                                     <motion.div
                                         layoutId="active-pill"
-                                        className="absolute inset-0 bg-muted rounded-full -z-10 border border-border"
+                                        className="absolute inset-0 bg-foreground/10 rounded-full -z-10 border border-foreground/15"
                                         initial={false}
                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                                     />
