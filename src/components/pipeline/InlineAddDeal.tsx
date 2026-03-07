@@ -31,7 +31,7 @@ export default function InlineAddDeal({ stage, onCreated, onCancel }: InlineAddD
     const { orgId } = useOrg()
     const [step, setStep] = useState<'client' | 'title'>('client')
     const [clientSearch, setClientSearch] = useState('')
-    const [clients, setClients] = useState<Client[]>([])
+    const [filteredClients, setFilteredClients] = useState<Client[]>([])
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [title, setTitle] = useState('')
     const [saving, setSaving] = useState(false)
@@ -39,17 +39,32 @@ export default function InlineAddDeal({ stage, onCreated, onCancel }: InlineAddD
     const clientInputRef = useRef<HTMLInputElement>(null)
     const titleInputRef = useRef<HTMLInputElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Load clients
-    useEffect(() => {
+    // Server-side client search with debounce
+    const searchClients = useCallback((query: string) => {
         if (!orgId) return
-        supabase
-            .from('clients')
-            .select('id, name, profile_picture_url')
-            .eq('org_id', orgId)
-            .order('name')
-            .then(({ data }) => setClients(data ?? []))
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(async () => {
+            let q = supabase
+                .from('clients')
+                .select('id, name, profile_picture_url')
+                .eq('org_id', orgId)
+                .order('name')
+                .limit(20)
+            if (query.trim()) {
+                q = q.ilike('name', `%${query.trim()}%`)
+            }
+            const { data } = await q
+            setFilteredClients(data ?? [])
+        }, 200)
     }, [orgId])
+
+    // Initial load + cleanup
+    useEffect(() => {
+        searchClients('')
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+    }, [searchClients])
 
     // Auto-focus client input
     useEffect(() => {
@@ -63,16 +78,9 @@ export default function InlineAddDeal({ stage, onCreated, onCancel }: InlineAddD
         }
     }, [step])
 
-    const searchLower = clientSearch.toLowerCase()
-
-    const filteredClients = useMemo(
-        () => clients.filter((c) => c.name.toLowerCase().includes(searchLower)),
-        [clients, searchLower]
-    )
-
     const exactMatchExists = useMemo(
-        () => clients.some((c) => c.name.toLowerCase() === searchLower.trim()),
-        [clients, searchLower]
+        () => filteredClients.some((c) => c.name.toLowerCase() === clientSearch.trim().toLowerCase()),
+        [filteredClients, clientSearch]
     )
 
     const handleSelectClient = useCallback((client: Client) => {
@@ -90,7 +98,7 @@ export default function InlineAddDeal({ stage, onCreated, onCancel }: InlineAddD
             .select('id, name, profile_picture_url')
             .single()
         if (error || !data) return
-        setClients((prev) => [...prev, data])
+        setFilteredClients((prev) => [...prev, data])
         handleSelectClient(data)
     }
 
@@ -161,6 +169,7 @@ export default function InlineAddDeal({ stage, onCreated, onCancel }: InlineAddD
                                     onChange={(e) => {
                                         setClientSearch(e.target.value)
                                         setShowDropdown(true)
+                                        searchClients(e.target.value)
                                     }}
                                     onFocus={() => setShowDropdown(true)}
                                     onKeyDown={handleClientKeyDown}

@@ -1,17 +1,18 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Plus, ClipboardList, ChevronDown, ChevronRight, Upload, User } from 'lucide-react'
+import { Search, Plus, ClipboardList, ChevronDown, ChevronRight, Upload, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { supabase } from '@/lib/supabase'
 import { useServiceRequests, useCreateServiceRequest, useUpdateServiceRequest } from '@/hooks/queries/useServiceRequests'
 import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES, logServiceRequestActivity } from '@/lib/service-requests'
-import type { ServiceRequest, NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType, ServiceRequestPriority } from '@/lib/service-requests'
+import type { ServiceRequest, NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType } from '@/lib/service-requests'
 import { SERVICE_STATUS_COLORS, SERVICE_PRIORITY_COLORS, getAccentBg } from '@/lib/colors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import ClientSelector from '@/components/ui/ClientSelector'
 import ServiceRequestDetailsModal from '@/components/servicing/ServiceRequestDetailsModal'
 
 function getRequestTypeLabel(value: string) {
@@ -23,17 +24,39 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: ServiceRequest; onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void; isDark: boolean; onRowClick: (id: string) => void }) {
+function ServiceRequestRow({ sr, onStatusChange, onUpdate, isDark, onRowClick }: {
+    sr: ServiceRequest
+    onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void
+    onUpdate: (id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) => void
+    isDark: boolean
+    onRowClick: (id: string) => void
+}) {
     const [showStatusMenu, setShowStatusMenu] = useState(false)
+    const [showPriorityMenu, setShowPriorityMenu] = useState(false)
+    const [editingTitle, setEditingTitle] = useState(false)
+    const [titleDraft, setTitleDraft] = useState(sr.title)
     const statusBtnRef = useRef<HTMLButtonElement>(null)
+    const priorityBtnRef = useRef<HTMLButtonElement>(null)
+    const titleInputRef = useRef<HTMLInputElement>(null)
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
+    const [priorityMenuPos, setPriorityMenuPos] = useState({ top: 0, left: 0 })
 
     const statusColor = SERVICE_STATUS_COLORS[sr.status]
     const priorityColor = SERVICE_PRIORITY_COLORS[sr.priority]
 
+    const commitTitle = () => {
+        const trimmed = titleDraft.trim()
+        if (trimmed && trimmed !== sr.title) {
+            onUpdate(sr.id, { title: trimmed })
+        } else {
+            setTitleDraft(sr.title)
+        }
+        setEditingTitle(false)
+    }
+
     return (
         <div
-            className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr_1fr] px-5 py-3 items-center border-b border-border/40 hover:bg-muted/20 transition-colors group cursor-pointer"
+            className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr] px-5 py-3 items-center border-b border-border/40 hover:bg-muted/20 transition-colors group cursor-pointer"
             onClick={() => onRowClick(sr.id)}
         >
             {/* CLIENT */}
@@ -48,20 +71,38 @@ function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: Ser
                 <span className="text-[13px] font-medium text-foreground truncate">{sr.client?.name}</span>
             </div>
 
-            {/* TITLE */}
-            <div className="pr-4 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                    <ClipboardList size={12} className="text-muted-foreground/40 shrink-0" />
-                    <span className="text-[13px] text-foreground truncate">{sr.title}</span>
-                </div>
+            {/* TITLE — inline editable */}
+            <div className="pr-4 min-w-0" onClick={(e) => e.stopPropagation()}>
+                {editingTitle ? (
+                    <input
+                        ref={titleInputRef}
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onBlur={commitTitle}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); commitTitle() }
+                            if (e.key === 'Escape') { setTitleDraft(sr.title); setEditingTitle(false) }
+                        }}
+                        autoFocus
+                        className="text-[13px] text-foreground bg-transparent border-b border-accent/40 outline-none w-full py-0.5"
+                    />
+                ) : (
+                    <div
+                        className="flex items-center gap-1.5 min-w-0 cursor-text"
+                        onClick={() => { setEditingTitle(true); setTitleDraft(sr.title) }}
+                    >
+                        <ClipboardList size={12} className="text-muted-foreground/40 shrink-0" />
+                        <span className="text-[13px] text-foreground truncate hover:text-accent/80 transition-colors">{sr.title}</span>
+                    </div>
+                )}
             </div>
 
-            {/* REQUEST TYPE */}
+            {/* POLICY # */}
             <div className="pr-4">
-                <span className="text-[12px] text-muted-foreground/70">{getRequestTypeLabel(sr.request_type)}</span>
+                <span className="text-[12px] text-muted-foreground/70">{sr.policy?.policy_number ?? '—'}</span>
             </div>
 
-            {/* STATUS */}
+            {/* STATUS — inline editable (existing) */}
             <div className="pr-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <button
                     ref={statusBtnRef}
@@ -70,7 +111,7 @@ function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: Ser
                         if (rect) setMenuPos({ top: rect.bottom + 4, left: rect.left })
                         setShowStatusMenu(!showStatusMenu)
                     }}
-                    className="text-[10px] font-medium w-[110px] text-center py-1 rounded-full whitespace-nowrap text-white/90 transition-colors"
+                    className="text-[10px] font-medium w-[110px] text-center py-1 rounded-full whitespace-nowrap text-white/90 transition-colors hover:opacity-80"
                     style={statusColor ? { backgroundColor: getAccentBg(statusColor, isDark) } : undefined}
                 >
                     {sr.status}
@@ -96,134 +137,314 @@ function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: Ser
                 )}
             </div>
 
-            {/* PRIORITY */}
-            <div className="pr-4 flex justify-center">
-                <span
-                    className="text-[10px] font-medium w-[64px] text-center py-1 rounded-full capitalize whitespace-nowrap text-white/90"
+            {/* PRIORITY — inline editable */}
+            <div className="pr-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <button
+                    ref={priorityBtnRef}
+                    onClick={() => {
+                        const rect = priorityBtnRef.current?.getBoundingClientRect()
+                        if (rect) setPriorityMenuPos({ top: rect.bottom + 4, left: rect.left })
+                        setShowPriorityMenu(!showPriorityMenu)
+                    }}
+                    className="text-[10px] font-medium w-[64px] text-center py-1 rounded-full capitalize whitespace-nowrap text-white/90 transition-colors hover:opacity-80"
                     style={priorityColor ? { backgroundColor: getAccentBg(priorityColor, isDark) } : undefined}
                 >
                     {sr.priority}
-                </span>
+                </button>
+                {showPriorityMenu && (
+                    <>
+                        <div className="fixed inset-0 z-[100]" onClick={() => setShowPriorityMenu(false)} />
+                        <div
+                            className="fixed z-[101] bg-popover border border-border rounded-xl shadow-lg py-1 w-[120px] animate-in fade-in-0 zoom-in-95 duration-100"
+                            style={{ top: priorityMenuPos.top, left: priorityMenuPos.left }}
+                        >
+                            {SERVICE_REQUEST_PRIORITIES.map(p => (
+                                <button
+                                    key={p}
+                                    onClick={() => { onUpdate(sr.id, { priority: p }); setShowPriorityMenu(false) }}
+                                    className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-muted/50 transition-colors capitalize ${sr.priority === p ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
 
-            {/* UPLOAD DOCUMENT */}
-            <div className="pr-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
+            {/* DOCS — opens detail modal */}
+            <div className="pr-4 flex justify-center" onClick={(e) => { e.stopPropagation(); onRowClick(sr.id) }}>
                 <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground/40 hover:text-accent">
                     <Upload size={14} />
                 </button>
             </div>
 
-            {/* ASSIGNED TO */}
-            <div className="flex items-center gap-2 pr-2">
-                <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0 ring-1 ring-border/50">
-                    <User size={12} className="text-muted-foreground/40" />
-                </div>
-                <span className="text-[12px] text-muted-foreground/60 truncate">Unassigned</span>
-            </div>
         </div>
     )
 }
 
-function NewServiceRequestModal({ orgId, onClose }: { orgId: string; onClose: () => void }) {
+interface InlineClient {
+    id: string
+    name: string
+    profile_picture_url: string | null
+}
+
+function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
+    orgId: string
+    onCreated: (input: NewServiceRequestInput) => void
+    onCancel: () => void
+}) {
     const { user } = useAuth()
-    const createMutation = useCreateServiceRequest(orgId)
-    const [form, setForm] = useState({
-        client_id: '',
-        request_type: '' as ServiceRequestType | '',
-        title: '',
-        description: '',
-        priority: 'medium' as ServiceRequestPriority,
-    })
-    const [error, setError] = useState<string | null>(null)
+    const [step, setStep] = useState<'client' | 'details'>('client')
+    const [clientSearch, setClientSearch] = useState('')
+    const [filteredClients, setFilteredClients] = useState<InlineClient[]>([])
+    const [selectedClient, setSelectedClient] = useState<InlineClient | null>(null)
+    const [requestType, setRequestType] = useState<ServiceRequestType | ''>('')
+    const [title, setTitle] = useState('')
+    const [saving, setSaving] = useState(false)
+    const [showDropdown, setShowDropdown] = useState(false)
+    const [clientPolicies, setClientPolicies] = useState<{ id: string; policy_number: string | null; product: string | null }[]>([])
+    const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
+    const clientInputRef = useRef<HTMLInputElement>(null)
+    const titleInputRef = useRef<HTMLInputElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault()
-        if (!user) return
-        if (!form.client_id) { setError('Please select a client.'); return }
-        if (!form.request_type) { setError('Please select a request type.'); return }
-        if (!form.title.trim()) { setError('Please enter a title.'); return }
-        setError(null)
+    // Server-side client search with debounce
+    const searchClients = useCallback((query: string) => {
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(async () => {
+            let q = supabase
+                .from('clients')
+                .select('id, name, profile_picture_url')
+                .eq('org_id', orgId)
+                .order('name')
+                .limit(20)
+            if (query.trim()) {
+                q = q.ilike('name', `%${query.trim()}%`)
+            }
+            const { data } = await q
+            setFilteredClients(data ?? [])
+        }, 200)
+    }, [orgId])
 
-        const input: NewServiceRequestInput = {
-            org_id: orgId,
-            owner_id: user.id,
-            client_id: form.client_id,
-            request_type: form.request_type as ServiceRequestType,
-            title: form.title.trim(),
-            description: form.description || undefined,
-            priority: form.priority,
-        }
+    // Initial load + cleanup
+    useEffect(() => {
+        searchClients('')
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+    }, [searchClients])
 
-        try {
-            await createMutation.mutateAsync(input)
-            onClose()
-        } catch (err) {
-            setError((err as Error).message)
-        }
+    // Auto-focus
+    useEffect(() => { clientInputRef.current?.focus() }, [])
+    useEffect(() => { if (step === 'details') titleInputRef.current?.focus() }, [step])
+
+    const exactMatchExists = useMemo(
+        () => filteredClients.some(c => c.name.toLowerCase() === clientSearch.trim().toLowerCase()),
+        [filteredClients, clientSearch]
+    )
+
+    const handleSelectClient = useCallback(async (client: InlineClient) => {
+        setSelectedClient(client)
+        setClientSearch(client.name)
+        setShowDropdown(false)
+        setStep('details')
+        // Fetch policies for this client
+        const { data } = await supabase
+            .from('policies')
+            .select('id, policy_number, product')
+            .eq('org_id', orgId)
+            .eq('client_id', client.id)
+            .order('created_at', { ascending: false })
+        setClientPolicies(data ?? [])
+        setSelectedPolicyId(null)
+    }, [orgId])
+
+    async function handleCreateClient() {
+        if (!user || !clientSearch.trim()) return
+        const { data, error } = await supabase
+            .from('clients')
+            .insert({ org_id: orgId, owner_id: user.id, name: clientSearch.trim() })
+            .select('id, name, profile_picture_url')
+            .single()
+        if (error || !data) return
+        setFilteredClients(prev => [...prev, data])
+        handleSelectClient(data)
     }
 
+    const handleSubmit = useCallback(async () => {
+        if (!user || !selectedClient || saving) return
+        setSaving(true)
+        const type: ServiceRequestType = requestType || 'INQUIRY'
+        onCreated({
+            org_id: orgId,
+            owner_id: user.id,
+            client_id: selectedClient.id,
+            policy_id: selectedPolicyId,
+            request_type: type,
+            title: title.trim() || getRequestTypeLabel(type),
+            priority: 'medium',
+        })
+    }, [user, selectedClient, requestType, selectedPolicyId, saving, orgId, title, onCreated])
+
+    // Click outside to close
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                onCancel()
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [onCancel])
+
     return (
-        <>
-            <div className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm" onClick={onClose} />
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                <div className="bg-card rounded-2xl shadow-lg w-full max-w-xl flex flex-col overflow-hidden border border-border">
-                    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-border/60">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-[15px] font-semibold text-foreground">New Service Request</h2>
-                            <button onClick={onClose} className="text-muted-foreground/50 hover:text-foreground transition-colors text-sm">Cancel</button>
-                        </div>
-                    </div>
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Client *</span>
-                            <ClientSelector orgId={orgId} value={form.client_id} onChange={(id) => setForm(f => ({ ...f, client_id: id }))} />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Request Type *</span>
-                            <select
-                                value={form.request_type}
-                                onChange={(e) => setForm(f => ({ ...f, request_type: e.target.value as ServiceRequestType }))}
-                                className="h-9 rounded-xl bg-muted/30 border border-muted-foreground/10 text-sm px-3 text-foreground"
-                            >
-                                <option value="">Select type...</option>
-                                {SERVICE_REQUEST_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Title *</span>
-                            <Input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} className="h-9 rounded-xl bg-muted/30 border-muted-foreground/10 shadow-none text-sm" />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Description</span>
-                            <textarea
-                                value={form.description}
-                                onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                                rows={3}
-                                className="rounded-xl bg-muted/30 border border-muted-foreground/10 text-sm px-3 py-2 text-foreground resize-none"
-                                placeholder="Add notes or details..."
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">Priority</span>
-                            <select
-                                value={form.priority}
-                                onChange={(e) => setForm(f => ({ ...f, priority: e.target.value as ServiceRequestPriority }))}
-                                className="h-9 rounded-xl bg-muted/30 border border-muted-foreground/10 text-sm px-3 text-foreground capitalize"
-                            >
-                                {SERVICE_REQUEST_PRIORITIES.map(p => <option key={p} value={p} className="capitalize">{p}</option>)}
-                            </select>
-                        </div>
-                        {error && <p className="text-[12px] text-destructive">{error}</p>}
-                        <div className="flex gap-2 pt-2 border-t border-border/40">
-                            <Button type="button" variant="secondary" className="flex-1 h-9 rounded-xl shadow-none text-sm" onClick={onClose}>Cancel</Button>
-                            <Button type="submit" className="flex-1 h-9 rounded-xl shadow-none text-sm font-medium" disabled={createMutation.isPending}>
-                                {createMutation.isPending ? 'Creating...' : 'Create Request'}
-                            </Button>
-                        </div>
-                    </form>
-                </div>
+        <motion.div
+            ref={containerRef}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden mb-4"
+        >
+            <div className="bg-card border border-border/80 dark:border-border/60 rounded-xl px-4 py-3 shadow-sm max-w-md">
+                <AnimatePresence mode="wait">
+                    {step === 'client' ? (
+                        <motion.div key="client" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+                            <div className="relative">
+                                <Input
+                                    ref={clientInputRef}
+                                    placeholder="Search or create client..."
+                                    value={clientSearch}
+                                    onChange={(e) => { setClientSearch(e.target.value); setShowDropdown(true); searchClients(e.target.value) }}
+                                    onFocus={() => setShowDropdown(true)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
+                                    className="h-9 text-sm rounded-lg bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background shadow-none"
+                                />
+                                <button
+                                    onClick={onCancel}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                            {showDropdown && (
+                                <div className="mt-1.5 border border-border rounded-lg overflow-hidden max-h-56 overflow-y-auto bg-popover shadow-md">
+                                    {filteredClients.map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors flex items-center gap-2"
+                                            onMouseDown={e => e.preventDefault()}
+                                            onClick={() => handleSelectClient(c)}
+                                        >
+                                            {c.profile_picture_url ? (
+                                                <img src={c.profile_picture_url} alt={c.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                                            ) : (
+                                                <div className="w-5 h-5 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                                                    <span className="text-[9px] font-semibold text-accent/70">{getInitials(c.name)}</span>
+                                                </div>
+                                            )}
+                                            <span className="text-sm text-foreground truncate">{c.name}</span>
+                                        </button>
+                                    ))}
+                                    {filteredClients.length === 0 && !clientSearch.trim() && (
+                                        <div className="px-3 py-2.5 text-xs text-muted-foreground text-center">No clients yet</div>
+                                    )}
+                                    {!exactMatchExists && clientSearch.trim() && (
+                                        <button
+                                            type="button"
+                                            onMouseDown={e => e.preventDefault()}
+                                            onClick={handleCreateClient}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-primary/5 transition-colors border-t border-border"
+                                        >
+                                            <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs shrink-0">+</span>
+                                            <span className="truncate">Create &ldquo;{clientSearch.trim()}&rdquo;</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </motion.div>
+                    ) : (
+                        <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="flex flex-col gap-2.5">
+                            {/* Selected client chip */}
+                            <div className="flex items-center gap-2">
+                                {selectedClient?.profile_picture_url ? (
+                                    <img src={selectedClient.profile_picture_url} alt={selectedClient.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                                ) : (
+                                    <div className="w-5 h-5 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                                        <span className="text-[9px] font-semibold text-accent/70">{getInitials(selectedClient?.name ?? '')}</span>
+                                    </div>
+                                )}
+                                <span className="text-xs text-muted-foreground truncate flex-1">{selectedClient?.name}</span>
+                                <button
+                                    onClick={() => { setStep('client'); setSelectedClient(null); setClientSearch(''); setClientPolicies([]); setSelectedPolicyId(null) }}
+                                    className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                >
+                                    <X size={11} />
+                                </button>
+                            </div>
+
+                            {/* Policy picker */}
+                            {clientPolicies.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {clientPolicies.map(p => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedPolicyId(selectedPolicyId === p.id ? null : p.id)
+                                                titleInputRef.current?.focus()
+                                            }}
+                                            className={`px-2 py-1 text-[11px] rounded-md border transition-colors truncate ${
+                                                selectedPolicyId === p.id
+                                                    ? 'bg-accent text-white font-medium border-accent'
+                                                    : 'bg-background text-muted-foreground border-border/60 hover:border-border hover:text-foreground'
+                                            }`}
+                                        >
+                                            {p.policy_number ?? 'No #'}{p.product ? ` · ${p.product}` : ''}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-[11px] text-muted-foreground/50">No policies found for this client</p>
+                            )}
+
+                            {/* Request type + Title input + submit */}
+                            <div className="flex items-center gap-1.5">
+                                <select
+                                    value={requestType}
+                                    onChange={e => setRequestType(e.target.value as ServiceRequestType)}
+                                    className="h-7 text-[11px] rounded-lg bg-muted/30 border border-muted-foreground/10 text-muted-foreground px-1.5 outline-none focus:border-accent/40 shrink-0"
+                                >
+                                    <option value="">Type</option>
+                                    {SERVICE_REQUEST_TYPES.map(t => (
+                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                    ))}
+                                </select>
+                                <Input
+                                    ref={titleInputRef}
+                                    placeholder="Title... (Enter to create)"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
+                                        if (e.key === 'Escape') onCancel()
+                                    }}
+                                    className="h-7 text-sm rounded-lg bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background shadow-none flex-1"
+                                />
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={saving}
+                                    className="px-2.5 py-1 text-[11px] font-medium text-white bg-accent rounded-lg hover:opacity-90 transition-colors disabled:opacity-50 shrink-0"
+                                >
+                                    {saving ? '...' : 'Add'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
-        </>
+        </motion.div>
     )
 }
 
@@ -233,6 +454,7 @@ function StageSection({
     isExpanded,
     onToggle,
     onStatusChange,
+    onUpdate,
     isDark,
     onRowClick
 }: {
@@ -241,6 +463,7 @@ function StageSection({
     isExpanded: boolean;
     onToggle: () => void;
     onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void;
+    onUpdate: (id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) => void;
     isDark: boolean;
     onRowClick: (id: string) => void;
 }) {
@@ -271,7 +494,7 @@ function StageSection({
             {isExpanded && (
                 <div className="mt-1 space-y-0.5 animate-in slide-in-from-top-1 duration-200">
                     {requests.map(sr => (
-                        <ServiceRequestRow key={sr.id} sr={sr} onStatusChange={onStatusChange} isDark={isDark} onRowClick={onRowClick} />
+                        <ServiceRequestRow key={sr.id} sr={sr} onStatusChange={onStatusChange} onUpdate={onUpdate} isDark={isDark} onRowClick={onRowClick} />
                     ))}
                 </div>
             )}
@@ -289,8 +512,9 @@ export default function ServicingPage() {
     const srIdFromSearch = searchParams.get('sr')
     const { data: serviceRequests = [], isLoading } = useServiceRequests(orgId ?? undefined)
     const updateMutation = useUpdateServiceRequest(orgId ?? '')
+    const createMutation = useCreateServiceRequest(orgId ?? '')
     const [search, setSearch] = useState('')
-    const [showModal, setShowModal] = useState(false)
+    const [showInlineAdd, setShowInlineAdd] = useState(false)
     const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
     const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>({
         'Completed': true,
@@ -336,6 +560,10 @@ export default function ServicingPage() {
         }
     }
 
+    function handleInlineUpdate(id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) {
+        updateMutation.mutate({ id, updates })
+    }
+
     const toggleStage = (status: string) => {
         setCollapsedStages(prev => ({
             ...prev,
@@ -365,7 +593,7 @@ export default function ServicingPage() {
                                 </span>
                             )}
                         </h1>
-                        <Button onClick={() => setShowModal(true)} className="h-8 text-xs rounded-full px-3 font-medium">
+                        <Button onClick={() => setShowInlineAdd(true)} className="h-8 text-xs rounded-full px-3 font-medium">
                             <Plus size={14} className="mr-1.5" /> New Request
                         </Button>
                     </div>
@@ -406,7 +634,7 @@ export default function ServicingPage() {
                             {serviceRequests.length === 0 ? "Track and manage client service requests." : "No results match your search."}
                         </p>
                         {serviceRequests.length === 0 ? (
-                            <Button onClick={() => setShowModal(true)} variant="secondary">
+                            <Button onClick={() => setShowInlineAdd(true)} variant="secondary">
                                 <Plus size={16} />
                                 Create a request
                             </Button>
@@ -420,16 +648,28 @@ export default function ServicingPage() {
                         )}
                     </div>
                 ) : (
+                    <div>
+                        <AnimatePresence>
+                            {showInlineAdd && (
+                                <InlineAddServiceRequest
+                                    orgId={orgId!}
+                                    onCreated={async (input) => {
+                                        await createMutation.mutateAsync(input)
+                                        setShowInlineAdd(false)
+                                    }}
+                                    onCancel={() => setShowInlineAdd(false)}
+                                />
+                            )}
+                        </AnimatePresence>
                     <Card className="border-none shadow-none bg-transparent">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr_1fr] px-5 py-2.5 border-b border-border/60 mb-2">
+                        <div className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr] px-5 py-2.5 border-b border-border/60 mb-2">
                             <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Client</div>
                             <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Title</div>
-                            <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Type</div>
+                            <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Policy #</div>
                             <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider text-center">Status</div>
                             <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider text-center">Priority</div>
                             <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider text-center">Docs</div>
-                            <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">Assigned</div>
                         </div>
 
                         {/* Grouped Stages */}
@@ -441,14 +681,14 @@ export default function ServicingPage() {
                                 isExpanded={!collapsedStages[status]}
                                 onToggle={() => toggleStage(status)}
                                 onStatusChange={handleStatusChange}
+                                onUpdate={handleInlineUpdate}
                                 isDark={isDark}
                                 onRowClick={(id) => setSelectedRequestId(id)}
                             />
                         ))}
                     </Card>
+                    </div>
                 )}
-
-                {showModal && <NewServiceRequestModal orgId={orgId} onClose={() => setShowModal(false)} />}
                 {selectedRequestId && (
                     <ServiceRequestDetailsModal
                         serviceRequestId={selectedRequestId}

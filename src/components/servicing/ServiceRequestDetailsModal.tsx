@@ -349,6 +349,11 @@ export default function ServiceRequestDetailsModal({
                                 <span className="text-[11px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-md">
                                     {getRequestTypeLabel(sr.request_type)}
                                 </span>
+                                {sr.policy?.policy_number && (
+                                    <span className="text-[11px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-md">
+                                        Policy #{sr.policy.policy_number}
+                                    </span>
+                                )}
                                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
                                     <Calendar size={10} className="shrink-0" />
                                     {new Date(sr.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
