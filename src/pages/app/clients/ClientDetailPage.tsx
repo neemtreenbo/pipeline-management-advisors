@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, Shield, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, Shield, ClipboardList, ChevronDown, ChevronRight, Cake } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
@@ -78,7 +78,6 @@ export default function ClientDetailPage() {
     const [deleting, setDeleting] = useState(false)
     const [activeTab, setActiveTab] = useState('deals')
     const [sidebarSections, setSidebarSections] = useState<Record<string, boolean>>({
-        contact: true,
         record: false,
         professional: false,
         relationships: false,
@@ -501,6 +500,23 @@ export default function ClientDetailPage() {
                                                     <span>{client.phone}</span>
                                                 </div>
                                             )}
+                                            {client.birthday && (() => {
+                                                const bday = new Date(client.birthday + 'T00:00:00')
+                                                const today = new Date()
+                                                let age = today.getFullYear() - bday.getFullYear()
+                                                if (today.getMonth() < bday.getMonth() || (today.getMonth() === bday.getMonth() && today.getDate() < bday.getDate())) {
+                                                    age--
+                                                }
+                                                return (
+                                                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                        <Cake size={13} />
+                                                        <span>
+                                                            {bday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            {' '}({age} yrs)
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })()}
                                         </div>
                                         {(client.tags ?? []).length > 0 && (
                                             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -518,39 +534,39 @@ export default function ClientDetailPage() {
                         </div>
 
                         {/* Tabs */}
-                        <div className="pb-4">
-                            <TabsList>
+                        <div className="pb-4 overflow-x-auto scrollbar-none flex sm:block justify-center">
+                            <TabsList className="w-max">
                                 <TabsTrigger value="deals" id="tab-deals">
-                                    <Briefcase size={14} className="mr-1.5" />
-                                    Deals
+                                    <Briefcase size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Deals</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="policies" id="tab-policies">
-                                    <Shield size={14} className="mr-1.5" />
-                                    Policies
+                                    <Shield size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Policies</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="servicing" id="tab-servicing">
-                                    <ClipboardList size={14} className="mr-1.5" />
-                                    Servicing
+                                    <ClipboardList size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Servicing</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="tasks" id="tab-tasks">
-                                    <CheckSquare size={14} className="mr-1.5" />
-                                    Tasks
+                                    <CheckSquare size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Tasks</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="notes" id="tab-notes">
-                                    <FileText size={14} className="mr-1.5" />
-                                    Notes
+                                    <FileText size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Notes</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="activity" id="tab-activity">
-                                    <Activity size={14} className="mr-1.5" />
-                                    Activity
+                                    <Activity size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Activity</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="intel" id="tab-intel">
-                                    <Activity size={14} className="mr-1.5" />
-                                    Intel
+                                    <Activity size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Intel</span>
                                 </TabsTrigger>
                                 <TabsTrigger value="mindmap" id="tab-mindmap">
-                                    <Brain size={14} className="mr-1.5" />
-                                    Mindmap
+                                    <Brain size={14} className="sm:mr-1.5" />
+                                    <span className="hidden sm:inline">Mindmap</span>
                                 </TabsTrigger>
                             </TabsList>
                         </div>
@@ -561,24 +577,7 @@ export default function ClientDetailPage() {
                 <div className="flex h-full">
                     {/* Sidebar — hidden on intel and mindmap tabs */}
                     {activeTab !== 'mindmap' && activeTab !== 'intel' && (
-                        <aside className="w-72 shrink-0 border-r border-border overflow-y-auto bg-background pr-4 py-5 flex flex-col gap-1">
-                            {/* Contact Details */}
-                            <button
-                                onClick={() => toggleSidebarSection('contact')}
-                                className="flex items-center gap-2 w-full text-left py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-                            >
-                                {sidebarSections.contact ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                Contact
-                            </button>
-                            {sidebarSections.contact && (
-                                <div className="flex flex-col gap-3 pl-5 pb-3">
-                                    <InfoRow label="Email" value={client.email} />
-                                    <InfoRow label="Phone" value={client.phone} />
-                                    <InfoRow label="Source" value={formatSource(client.source)} />
-                                    <InfoRow label="Birthday" value={client.birthday ? new Date(client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null} />
-                                </div>
-                            )}
-
+                        <aside className="w-72 shrink-0 border-r border-border overflow-y-auto bg-background pr-4 py-5 hidden lg:flex flex-col gap-1">
                             {/* Professional */}
                             {(client.company_name || client.company_industry || client.company_website || client.job_title || client.occupation) && (
                                 <>

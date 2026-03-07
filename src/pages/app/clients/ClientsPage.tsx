@@ -14,7 +14,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-type SortField = 'name' | 'source' | 'email' | 'phone' | 'created_at'
+type SortField = 'name' | 'source' | 'email' | 'phone' | 'birthday'
 
 interface Client {
     id: string
@@ -24,6 +24,7 @@ interface Client {
     source: string | null
     tags: string[] | null
     created_at: string
+    birthday: string | null
     owner_id: string
     org_id: string
     profile_picture_url?: string | null
@@ -31,7 +32,7 @@ interface Client {
 
 type InlineEdit = {
     id: string
-    field: 'name' | 'email' | 'phone' | 'source'
+    field: 'name' | 'email' | 'phone' | 'source' | 'birthday'
     value: string
 }
 
@@ -180,6 +181,34 @@ const InlineCell = memo(function InlineCell({
         )
     }
 
+    if (field === 'birthday') {
+        return (
+            <div className="relative">
+                {isEditing ? (
+                    <input
+                        ref={inputRef}
+                        type="date"
+                        value={editValue}
+                        onChange={e => { onSave(e.target.value) }}
+                        onBlur={() => onCancel()}
+                        onKeyDown={e => {
+                            if (e.key === 'Escape') onCancel()
+                        }}
+                        className="w-full text-[12px] bg-card border border-accent/30 rounded-lg px-2 py-1 outline-none ring-2 ring-accent/10 focus:ring-accent/20 focus:border-accent/40 transition-all shadow-sm"
+                    />
+                ) : (
+                    <div
+                        className="cursor-text rounded px-1.5 py-1 -mx-1.5 hover:bg-muted/60 transition-colors duration-150 min-h-[26px] flex items-center gap-1 group/cell"
+                        onClick={() => onStartEdit(client, field)}
+                    >
+                        {display || <span className="text-muted-foreground/25 text-[13px]">{placeholder}</span>}
+                        <Pencil size={10} className="text-muted-foreground/0 group-hover/cell:text-muted-foreground/30 transition-colors shrink-0" />
+                    </div>
+                )}
+            </div>
+        )
+    }
+
     return (
         <div className="relative">
             {isEditing ? (
@@ -231,10 +260,6 @@ const SOURCE_FILTERS = [
     { value: 'event', label: 'Event' },
 ]
 
-function formatDate(dateStr: string) {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 function getInitials(name: string) {
     if (!name) return '?'
@@ -325,7 +350,7 @@ function VirtualizedClientTable({
                     { field: 'source', label: 'Source' },
                     { field: 'email', label: 'Email' },
                     { field: 'phone', label: 'Phone' },
-                    { field: 'created_at', label: 'Added' },
+                    { field: 'birthday', label: 'Birthday' },
                 ].map(({ field, label }) => {
                     const isActive = field && sortField === field;
                     return (
@@ -580,9 +605,33 @@ function VirtualizedClientTable({
                                     />
                                 </div>
 
-                                {/* Added date */}
-                                <div className="text-[12px] text-muted-foreground/40 tabular-nums">
-                                    {formatDate(client.created_at)}
+                                {/* Birthday */}
+                                <div>
+                                    <InlineCell
+                                        client={client}
+                                        field="birthday"
+                                        display={
+                                            client.birthday ? (
+                                                <span className="text-[12px] text-muted-foreground/60 tabular-nums">
+                                                    {(() => {
+                                                        const bday = new Date(client.birthday + 'T00:00:00')
+                                                        const today = new Date()
+                                                        let age = today.getFullYear() - bday.getFullYear()
+                                                        if (today.getMonth() < bday.getMonth() || (today.getMonth() === bday.getMonth() && today.getDate() < bday.getDate())) age--
+                                                        return `${bday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${age})`
+                                                    })()}
+                                                </span>
+                                            ) : null
+                                        }
+                                        placeholder="—"
+                                        isEditing={inlineEdit?.id === client.id && inlineEdit?.field === 'birthday'}
+                                        editValue={inlineEdit?.id === client.id && inlineEdit?.field === 'birthday' ? inlineEdit.value : ''}
+                                        onEditChange={handleEditChange}
+                                        onSave={saveInlineEdit}
+                                        onCancel={handleCancelEdit}
+                                        onStartEdit={startEdit}
+                                        inputRef={inlineInputRef}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -705,9 +754,9 @@ export default function ClientsPage() {
             result = result.filter(c => c.source === sourceFilter)
         }
         return result.sort((a, b) => {
-            if (sortField === 'created_at') {
-                const tA = new Date(a.created_at).getTime()
-                const tB = new Date(b.created_at).getTime()
+            if (sortField === 'birthday') {
+                const tA = a.birthday ? new Date(a.birthday + 'T00:00:00').getTime() : 0
+                const tB = b.birthday ? new Date(b.birthday + 'T00:00:00').getTime() : 0
                 return sortDir === 'asc' ? tA - tB : tB - tA
             }
             const valA = (a[sortField] || '').toLowerCase()
