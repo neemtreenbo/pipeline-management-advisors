@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useServiceRequests, useCreateServiceRequest, useUpdateServiceRequest } from '@/hooks/queries/useServiceRequests'
-import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES } from '@/lib/service-requests'
+import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES, logServiceRequestActivity } from '@/lib/service-requests'
 import type { ServiceRequest, NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType, ServiceRequestPriority } from '@/lib/service-requests'
 import { SERVICE_STATUS_COLORS, SERVICE_PRIORITY_COLORS, getAccentBg } from '@/lib/colors'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,7 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: ServiceRequest; onStatusChange: (id: string, status: ServiceRequestStatus) => void; isDark: boolean; onRowClick: (id: string) => void }) {
+function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: ServiceRequest; onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void; isDark: boolean; onRowClick: (id: string) => void }) {
     const [showStatusMenu, setShowStatusMenu] = useState(false)
     const statusBtnRef = useRef<HTMLButtonElement>(null)
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
@@ -85,7 +85,7 @@ function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: Ser
                             {SERVICE_REQUEST_STATUSES.map(s => (
                                 <button
                                     key={s}
-                                    onClick={() => { onStatusChange(sr.id, s); setShowStatusMenu(false) }}
+                                    onClick={() => { onStatusChange(sr.id, s, sr.status); setShowStatusMenu(false) }}
                                     className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-muted/50 transition-colors ${sr.status === s ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
                                 >
                                     {s}
@@ -240,7 +240,7 @@ function StageSection({
     requests: ServiceRequest[];
     isExpanded: boolean;
     onToggle: () => void;
-    onStatusChange: (id: string, status: ServiceRequestStatus) => void;
+    onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void;
     isDark: boolean;
     onRowClick: (id: string) => void;
 }) {
@@ -326,8 +326,14 @@ export default function ServicingPage() {
         [requestsByStage]
     )
 
-    function handleStatusChange(id: string, status: ServiceRequestStatus) {
+    function handleStatusChange(id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) {
         updateMutation.mutate({ id, updates: { status } })
+        if (oldStatus && oldStatus !== status && user) {
+            logServiceRequestActivity(orgId!, user.id, id, 'status_changed', {
+                from: oldStatus,
+                to: status,
+            })
+        }
     }
 
     const toggleStage = (status: string) => {
