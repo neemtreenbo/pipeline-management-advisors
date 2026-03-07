@@ -66,6 +66,7 @@ export default function ClientDetailPage() {
     const [activities, setActivities] = useState<Array<{
         id: string; event_type: string; entity_type: string; entity_id: string; data: Record<string, unknown>; created_at: string; actor_id: string
     }>>([])
+    const [contextServiceRequests, setContextServiceRequests] = useState<{ id: string; title: string }[]>([])
 
     // Edit state
     const [editing, setEditing] = useState(false)
@@ -118,6 +119,7 @@ export default function ClientDetailPage() {
         const dealIds = deals.map(d => d.id)
 
         async function fetchActivities() {
+            // Fetch linked notes/tasks
             let orLinkQuery = `and(to_type.eq.client,to_id.eq.${clientId})`
             if (dealIds.length > 0) {
                 orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
@@ -127,6 +129,14 @@ export default function ClientDetailPage() {
                 .select('from_id, from_type')
                 .in('from_type', ['note', 'task'])
                 .or(orLinkQuery)
+
+            // Fetch service request IDs and titles for this client
+            const { data: srRows } = await supabase
+                .from('service_requests')
+                .select('id, title')
+                .eq('client_id', clientId)
+            const srIds = srRows?.map(r => r.id) ?? []
+            setContextServiceRequests(srRows?.map(r => ({ id: r.id, title: r.title })) ?? [])
 
             const noteIds = Array.from(new Set(links?.filter(l => l.from_type === 'note').map(l => l.from_id) || []))
             const taskIds = Array.from(new Set(links?.filter(l => l.from_type === 'task').map(l => l.from_id) || []))
@@ -145,6 +155,9 @@ export default function ClientDetailPage() {
             }
             if (taskIds.length > 0) {
                 chunks.push(`and(entity_type.eq.task,entity_id.in.(${taskIds.join(',')}))`)
+            }
+            if (srIds.length > 0) {
+                chunks.push(`and(entity_type.eq.service_request,entity_id.in.(${srIds.join(',')}))`)
             }
 
             query = query.or(chunks.join(','))
@@ -795,6 +808,7 @@ export default function ClientDetailPage() {
                         <ActivityTimeline
                             activities={activities}
                             contextDeals={contextDeals}
+                            contextServiceRequests={contextServiceRequests}
                         />
                     </TabsContent >
 

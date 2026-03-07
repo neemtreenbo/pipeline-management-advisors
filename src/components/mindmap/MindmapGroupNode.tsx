@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { type NodeProps, type Node } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Briefcase, CheckSquare, Users } from 'lucide-react'
+import { FileText, Briefcase, CheckSquare, Users, ClipboardList } from 'lucide-react'
 
 export interface GroupNodeItem {
   label: string
@@ -11,7 +11,7 @@ export interface GroupNodeItem {
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
-  entityType: 'deal' | 'note' | 'tasks' | 'relationship'
+  entityType: 'deal' | 'note' | 'tasks' | 'relationship' | 'service_request'
   title: string
   items: GroupNodeItem[]
 }
@@ -21,6 +21,7 @@ const ICON_MAP = {
   note: FileText,
   tasks: CheckSquare,
   relationship: Users,
+  service_request: ClipboardList,
 }
 
 const COLOR_MAP = {
@@ -28,6 +29,7 @@ const COLOR_MAP = {
   note: { icon: 'text-blue-500', border: 'border-blue-500/30', bg: 'bg-blue-500/5' },
   tasks: { icon: 'text-orange-500', border: 'border-orange-500/30', bg: 'bg-orange-500/5' },
   relationship: { icon: 'text-purple-500', border: 'border-purple-500/30', bg: 'bg-purple-500/5' },
+  service_request: { icon: 'text-cyan-500', border: 'border-cyan-500/30', bg: 'bg-cyan-500/5' },
 }
 
 export default memo(function MindmapGroupNode({ data }: NodeProps<Node<GroupNodeData>>) {

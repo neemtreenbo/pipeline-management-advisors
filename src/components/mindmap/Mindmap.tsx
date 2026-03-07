@@ -14,6 +14,7 @@ import { useDealsByClient } from '@/hooks/queries/useDeals'
 import { useEntityTasks } from '@/hooks/queries/useTasks'
 import { useEntityNotes } from '@/hooks/queries/useNotes'
 import { useClientRelationships } from '@/hooks/queries/useClients'
+import { useServiceRequestsByClient } from '@/hooks/queries/useServiceRequests'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { StickyNote } from 'lucide-react'
@@ -39,6 +40,7 @@ const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   'group-tasks': { x: -SPACING_X - GROUP_W, y: -NODE_H / 2 },
   'group-notes': { x: -GROUP_W / 2, y: NODE_H / 2 + 100 },
   'group-relationships': { x: -GROUP_W / 2, y: -NODE_H / 2 - 160 },
+  'group-service-requests': { x: SPACING_X, y: NODE_H / 2 + 100 },
 }
 
 const RELATION_LABELS: Record<string, string> = {
@@ -65,6 +67,7 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, email, phone, o
   const { data: tasks = [], isLoading: tasksLoading } = useEntityTasks(orgId, 'client', clientId)
   const { data: notes = [], isLoading: notesLoading } = useEntityNotes('client', clientId)
   const { data: relationships = [], isLoading: relationshipsLoading } = useClientRelationships(clientId, orgId)
+  const { data: serviceRequests = [], isLoading: serviceRequestsLoading } = useServiceRequestsByClient(clientId)
 
   const clientDataRef = useRef(clientData)
   const initialPositionsRef = useRef<MindmapPositions | null>(
@@ -81,7 +84,19 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, email, phone, o
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
   const openDealRef = useRef((id: string) => setSelectedDealId(id))
 
-  const isLoading = dealsLoading || tasksLoading || notesLoading || relationshipsLoading
+  const isLoading = dealsLoading || tasksLoading || notesLoading || relationshipsLoading || serviceRequestsLoading
+
+  // Stable fingerprint of query data to avoid infinite re-render loops.
+  // React-query returns new array references on every render triggered by setNodes,
+  // so we serialize the meaningful IDs/values into a string for useMemo deps.
+  const dataFingerprint = useMemo(() => {
+    const d = deals.map(d => d.id).join(',')
+    const t = tasks.filter(t => t.status !== 'completed').map(t => t.id + t.title + t.priority).join(',')
+    const n = notes.map(n => n.id + (n.title || '')).join(',')
+    const r = relationships.map(r => r.relatedClientId + r.relationType).join(',')
+    const sr = serviceRequests.map(s => s.id + s.status).join(',')
+    return `${clientId}|${clientName}|${email}|${phone}|${d}|${t}|${n}|${r}|${sr}`
+  }, [clientId, clientName, email, phone, deals, notes, tasks, relationships, serviceRequests])
 
   // Stable callback refs so sticky nodes don't cause re-memos
   const stickyCallbacksRef = useRef({
@@ -190,18 +205,42 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, email, phone, o
       })
     }
 
+    const openServiceRequests = serviceRequests.filter(s => s.status !== 'Completed' && s.status !== 'Rejected')
+    if (openServiceRequests.length > 0) {
+      nodes.push({
+        id: 'group-service-requests',
+        type: 'mindmapGroup',
+        position: getPos('group-service-requests', DEFAULT_POSITIONS['group-service-requests']),
+        data: {
+          entityType: 'service_request' as const,
+          title: `${openServiceRequests.length} Service Request${openServiceRequests.length === 1 ? '' : 's'}`,
+          items: openServiceRequests.map((sr) => ({
+            label: sr.title,
+            subtitle: sr.status,
+            navigateTo: '/app/servicing',
+          })),
+        },
+      })
+    }
+
     // Add sticky notes
     nodes.push(...buildStickyNodes(stickiesRef.current, getPos))
 
     return nodes
-  }, [clientId, clientName, profilePictureUrl, email, phone, deals, notes, tasks, relationships, buildStickyNodes])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataFingerprint, profilePictureUrl, buildStickyNodes])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
 
   // Sync when initialNodes change (data refetch)
+  const prevInitialNodesRef = useRef(initialNodes)
   useEffect(() => {
-    setNodes(initialNodes)
-  }, [initialNodes, setNodes])
+    if (prevInitialNodesRef.current !== initialNodes) {
+      prevInitialNodesRef.current = initialNodes
+      setNodes(initialNodes)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNodes])
 
   const persistPositions = useCallback((positions: MindmapPositions) => {
     const newData = { ...(clientDataRef.current ?? {}), mindmapPositions: positions }

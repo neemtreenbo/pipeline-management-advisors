@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Plus, ClipboardList, ChevronDown, ChevronRight, Upload, User } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
@@ -283,6 +284,9 @@ export default function ServicingPage() {
     const { orgId } = useOrg()
     const { theme } = useTheme()
     const isDark = theme === 'dark'
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const srIdFromSearch = searchParams.get('sr')
     const { data: serviceRequests = [], isLoading } = useServiceRequests(orgId ?? undefined)
     const updateMutation = useUpdateServiceRequest(orgId ?? '')
     const [search, setSearch] = useState('')
@@ -445,6 +449,14 @@ export default function ServicingPage() {
                         onClose={() => setSelectedRequestId(null)}
                         onStatusChange={handleStatusChange}
                         onDeleted={() => setSelectedRequestId(null)}
+                    />
+                )}
+                {srIdFromSearch && !selectedRequestId && (
+                    <ServiceRequestDetailsModal
+                        serviceRequestId={srIdFromSearch}
+                        onClose={() => navigate('/app/servicing', { replace: true })}
+                        onStatusChange={handleStatusChange}
+                        onDeleted={() => navigate('/app/servicing', { replace: true })}
                     />
                 )}
             </div>

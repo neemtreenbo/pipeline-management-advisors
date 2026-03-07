@@ -22,16 +22,20 @@ import {
     logServiceRequestActivity,
 } from '@/lib/service-requests'
 import type { ServiceRequest, ServiceRequestStatus, ServiceRequestPriority } from '@/lib/service-requests'
-import { useServiceRequest, useServiceRequestAttachments } from '@/hooks/queries/useServiceRequests'
+import { useServiceRequest, useServiceRequestAttachments, useServiceRequestActivities } from '@/hooks/queries/useServiceRequests'
 import { SERVICE_STATUS_COLORS, SERVICE_PRIORITY_COLORS, getAccentBg } from '@/lib/colors'
 import { queryKeys } from '@/lib/queryKeys'
 import ServiceRequestDocumentUploader from '@/components/servicing/ServiceRequestDocumentUploader'
+import CommentThread from '@/components/comments/CommentThread'
+import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
+import type { ActivityRecord } from '@/components/pipeline/ActivityTimeline'
+import { useComments } from '@/hooks/queries/useComments'
 
 function getRequestTypeLabel(value: string) {
     return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
 }
 
-type Tab = 'documents' | 'activity'
+type Tab = 'documents' | 'comments' | 'activity'
 
 interface ServiceRequestDetailsModalProps {
     serviceRequestId: string
@@ -54,6 +58,8 @@ export default function ServiceRequestDetailsModal({
 
     const { data: sr = null, isLoading } = useServiceRequest(serviceRequestId)
     const { data: attachments = [] } = useServiceRequestAttachments(serviceRequestId)
+    const { data: comments = [] } = useComments('service_request', serviceRequestId)
+    const { data: activities = [] } = useServiceRequestActivities(serviceRequestId)
 
     const [activeTab, setActiveTab] = useState<Tab>('documents')
     const [editingStatus, setEditingStatus] = useState(false)
@@ -79,6 +85,7 @@ export default function ServiceRequestDetailsModal({
                 to: newStatus,
             })
             qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.all(orgId) })
+            qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.activities(serviceRequestId) })
         } catch {
             qc.setQueryData<ServiceRequest>(key, (d) => d ? { ...d, status: oldStatus } as ServiceRequest : d as unknown as ServiceRequest)
         }
@@ -376,7 +383,7 @@ export default function ServiceRequestDetailsModal({
 
                         {/* Tabs */}
                         <div className="px-6 flex gap-0">
-                            {(['documents', 'activity'] as Tab[]).map((tab) => (
+                            {(['documents', 'comments', 'activity'] as Tab[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -389,7 +396,9 @@ export default function ServiceRequestDetailsModal({
                                 >
                                     {tab === 'documents'
                                         ? `Documents${attachments.length > 0 ? ` · ${attachments.length}` : ''}`
-                                        : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                        : tab === 'comments'
+                                        ? `Comments${comments.length > 0 ? ` · ${comments.length}` : ''}`
+                                        : `Activity${activities.length > 0 ? ` · ${activities.length}` : ''}`}
                                 </button>
                             ))}
                         </div>
@@ -404,15 +413,29 @@ export default function ServiceRequestDetailsModal({
                                     orgId={orgId}
                                     uploadedBy={user.id}
                                     attachments={attachments}
-                                    onUploaded={() => qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.attachments(serviceRequestId) })}
+                                    onUploaded={() => {
+                                        qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.attachments(serviceRequestId) })
+                                        qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.activities(serviceRequestId) })
+                                    }}
                                     onDeleted={() => qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.attachments(serviceRequestId) })}
                                 />
                             )}
                         </div>
+                        <div className={activeTab === 'comments' ? 'h-full flex flex-col' : 'hidden'}>
+                            <CommentThread
+                                entityType="service_request"
+                                entityId={serviceRequestId}
+                                onCommentCreated={async (comment) => {
+                                    if (!orgId || !user) return
+                                    await logServiceRequestActivity(orgId, user.id, serviceRequestId, 'comment_added', {
+                                        body_preview: comment.body.slice(0, 100),
+                                    })
+                                    qc.invalidateQueries({ queryKey: queryKeys.serviceRequests.activities(serviceRequestId) })
+                                }}
+                            />
+                        </div>
                         <div className={activeTab === 'activity' ? '' : 'hidden'}>
-                            <div className="text-center py-8">
-                                <p className="text-[13px] text-muted-foreground/50">Activity log coming soon.</p>
-                            </div>
+                            <ActivityTimeline activities={activities as ActivityRecord[]} />
                         </div>
                     </div>
                 </div>

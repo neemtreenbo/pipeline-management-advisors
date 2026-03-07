@@ -27,12 +27,14 @@ import ProposalUploader from '@/components/pipeline/ProposalUploader'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { getDealIcon } from './DealIcon'
 import NotesList from '@/components/notes/NotesList'
+import CommentThread from '@/components/comments/CommentThread'
+import { useComments } from '@/hooks/queries/useComments'
 
 function formatCurrency(value: number) {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
 }
 
-type Tab = 'proposals' | 'notes' | 'activity'
+type Tab = 'proposals' | 'notes' | 'comments' | 'activity'
 
 interface DealDetailsModalProps {
     dealId: string
@@ -49,6 +51,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     const { data: deal = null, isLoading: dealLoading } = useDeal(dealId)
     const { data: attachments = [], isLoading: attachmentsLoading } = useDealAttachments(dealId)
     const { data: activities = [], isLoading: activitiesLoading } = useDealActivities(dealId)
+    const { data: dealComments = [] } = useComments('deal', dealId)
     const loading = dealLoading || attachmentsLoading || activitiesLoading
 
     const [activeTab, setActiveTab] = useState<Tab>('proposals')
@@ -420,7 +423,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
 
                         {/* Tabs */}
                         <div className="px-6 flex gap-0">
-                            {(['proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
+                            {(['proposals', 'notes', 'comments', 'activity'] as Tab[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -433,6 +436,8 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                 >
                                     {tab === 'proposals'
                                         ? `Proposals${attachments.length > 0 ? ` · ${attachments.length}` : ''}`
+                                        : tab === 'comments'
+                                        ? `Comments${dealComments.length > 0 ? ` · ${dealComments.length}` : ''}`
                                         : tab.charAt(0).toUpperCase() + tab.slice(1)}
                                 </button>
                             ))}
@@ -464,6 +469,9 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
                                     onActivityAdded={() => qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })}
                                 />
                             )}
+                        </div>
+                        <div className={activeTab === 'comments' ? 'h-full flex flex-col' : 'hidden'}>
+                            <CommentThread entityType="deal" entityId={dealId} />
                         </div>
                         <div className={activeTab === 'activity' ? '' : 'hidden'}>
                             <ActivityTimeline activities={activities} />

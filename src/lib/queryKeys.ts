@@ -45,6 +45,13 @@ export const queryKeys = {
     byClient: (clientId: string) => ['serviceRequests', 'byClient', clientId] as const,
     byPolicy: (policyId: string) => ['serviceRequests', 'byPolicy', policyId] as const,
     attachments: (id: string) => ['serviceRequests', 'attachments', id] as const,
+    activities: (id: string) => ['serviceRequests', 'activities', id] as const,
+  },
+  comments: {
+    byEntity: (entityType: string, entityId: string) => ['comments', entityType, entityId] as const,
+  },
+  members: {
+    byOrg: (orgId: string) => ['members', orgId] as const,
   },
   search: {
     global: (orgId: string, query: string) => ['search', 'global', orgId, query] as const,

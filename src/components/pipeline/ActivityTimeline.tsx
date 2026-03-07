@@ -16,6 +16,7 @@ export interface ActivityRecord {
 interface ActivityTimelineProps {
     activities: ActivityRecord[]
     contextDeals?: { id: string; name: string }[]
+    contextServiceRequests?: { id: string; title: string }[]
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -28,6 +29,10 @@ const EVENT_LABELS: Record<string, string> = {
     task_created: 'Task added',
     task_completed: 'Task completed',
     task_uncompleted: 'Task reopened',
+    service_request_created: 'Request created',
+    status_changed: 'Status changed',
+    document_uploaded: 'Document uploaded',
+    comment_added: 'Comment added',
 }
 
 function getLabel(eventType: string) {
@@ -68,6 +73,22 @@ function getDetail(activity: ActivityRecord): React.ReactNode {
         case 'task_completed':
         case 'task_uncompleted':
             return (d.title as string) || null
+        case 'status_changed':
+            return (
+                <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground/60">{d.from as string}</span>
+                    <span className="text-muted-foreground/30">→</span>
+                    <span className="text-foreground/70 font-medium">{d.to as string}</span>
+                </span>
+            )
+        case 'document_uploaded':
+            return d.file_name ? (d.file_name as string) : null
+        case 'comment_added':
+            return d.body_preview ? (
+                <span className="text-muted-foreground/60 italic">"{(d.body_preview as string).slice(0, 80)}{(d.body_preview as string).length > 80 ? '…' : ''}"</span>
+            ) : null
+        case 'service_request_created':
+            return d.request_type ? (d.title as string) || (d.request_type as string).replace(/_/g, ' ') : null
         default:
             return null
     }
@@ -108,9 +129,13 @@ const EVENT_DOT_COLORS: Record<string, typeof ACCENT_PALETTE[keyof typeof ACCENT
     task_created:       ACCENT_PALETTE.teal,
     task_completed:     ACCENT_PALETTE.green,
     task_uncompleted:   ACCENT_PALETTE.cyan,
+    service_request_created: ACCENT_PALETTE.blue,
+    status_changed:     ACCENT_PALETTE.purple,
+    document_uploaded:  ACCENT_PALETTE.orange,
+    comment_added:      ACCENT_PALETTE.teal,
 }
 
-export default function ActivityTimeline({ activities, contextDeals }: ActivityTimelineProps) {
+export default function ActivityTimeline({ activities, contextDeals, contextServiceRequests }: ActivityTimelineProps) {
     const { theme } = useTheme()
     const isDark = theme === 'dark'
 
@@ -130,6 +155,8 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                 const isLast = idx === activities.length - 1
                 const dealContext = contextDeals?.find(d => d.id === activity.entity_id)
                 const isDealActivity = activity.entity_type === 'deal' && !!dealContext
+                const srContext = contextServiceRequests?.find(s => s.id === activity.entity_id)
+                const isSrActivity = activity.entity_type === 'service_request' && !!srContext
 
                 return (
                     <div key={activity.id} className="flex gap-3">
@@ -159,6 +186,25 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                                                 className="text-[13px] font-medium text-foreground/80 hover:text-accent transition-colors duration-150 leading-snug truncate block"
                                             >
                                                 {dealContext!.name}
+                                            </Link>
+                                            <p className="text-[12px] text-muted-foreground/60 mt-0.5 leading-snug">
+                                                {getLabel(activity.event_type)}
+                                                {detail && (
+                                                    <>
+                                                        <span className="mx-1 text-muted-foreground/30">·</span>
+                                                        <span className="text-[12px]">{detail}</span>
+                                                    </>
+                                                )}
+                                            </p>
+                                        </>
+                                    ) : isSrActivity ? (
+                                        // Client context: service request title is the primary anchor
+                                        <>
+                                            <Link
+                                                to={`/app/servicing?sr=${activity.entity_id}`}
+                                                className="text-[13px] font-medium text-foreground/80 hover:text-accent transition-colors duration-150 leading-snug truncate block"
+                                            >
+                                                {srContext!.title}
                                             </Link>
                                             <p className="text-[12px] text-muted-foreground/60 mt-0.5 leading-snug">
                                                 {getLabel(activity.event_type)}

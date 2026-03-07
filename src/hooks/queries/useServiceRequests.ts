@@ -4,6 +4,7 @@ import {
     fetchServiceRequests, fetchServiceRequestsByClient, fetchServiceRequestById,
     createServiceRequest, updateServiceRequest, deleteServiceRequest,
     logServiceRequestActivity, fetchServiceRequestAttachments,
+    fetchServiceRequestActivities,
 } from '@/lib/service-requests'
 import type { NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType } from '@/lib/service-requests'
 
@@ -31,6 +32,14 @@ export function useServiceRequest(id: string | undefined) {
         queryKey: queryKeys.serviceRequests.detail(id!),
         queryFn: () => fetchServiceRequestById(id!),
         enabled: !!id,
+    })
+}
+
+export function useServiceRequestActivities(serviceRequestId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.serviceRequests.activities(serviceRequestId!),
+        queryFn: () => fetchServiceRequestActivities(serviceRequestId!),
+        enabled: !!serviceRequestId,
     })
 }
 

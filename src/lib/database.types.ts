@@ -153,6 +153,50 @@ export type Database = {
           },
         ]
       }
+      comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          mentions: string[] | null
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          mentions?: string[] | null
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          mentions?: string[] | null
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_attachments: {
         Row: {
           created_at: string | null
@@ -346,6 +390,41 @@ export type Database = {
           },
         ]
       }
+      network_positions: {
+        Row: {
+          id: string
+          org_id: string
+          pinned_client_ids: string[]
+          positions: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          pinned_client_ids?: string[]
+          positions?: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          pinned_client_ids?: string[]
+          positions?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_positions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           author_id: string
@@ -416,6 +495,89 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      policies: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          data: Json | null
+          id: string
+          insured_client_id: string | null
+          issue_date: string | null
+          org_id: string
+          owner_id: string
+          paying_years: number | null
+          policy_number: string | null
+          policy_owner_client_id: string | null
+          premium: number | null
+          premium_mode: string | null
+          product: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          insured_client_id?: string | null
+          issue_date?: string | null
+          org_id: string
+          owner_id: string
+          paying_years?: number | null
+          policy_number?: string | null
+          policy_owner_client_id?: string | null
+          premium?: number | null
+          premium_mode?: string | null
+          product?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          insured_client_id?: string | null
+          issue_date?: string | null
+          org_id?: string
+          owner_id?: string
+          paying_years?: number | null
+          policy_number?: string | null
+          policy_owner_client_id?: string | null
+          premium?: number | null
+          premium_mode?: string | null
+          product?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_insured_client_id_fkey"
+            columns: ["insured_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_policy_owner_client_id_fkey"
+            columns: ["policy_owner_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -536,89 +698,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      policies: {
-        Row: {
-          client_id: string
-          created_at: string | null
-          data: Json | null
-          id: string
-          insured_client_id: string | null
-          issue_date: string | null
-          org_id: string
-          owner_id: string
-          paying_years: number | null
-          policy_number: string | null
-          policy_owner_client_id: string | null
-          premium: number | null
-          premium_mode: string | null
-          product: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string | null
-          data?: Json | null
-          id?: string
-          insured_client_id?: string | null
-          issue_date?: string | null
-          org_id: string
-          owner_id: string
-          paying_years?: number | null
-          policy_number?: string | null
-          policy_owner_client_id?: string | null
-          premium?: number | null
-          premium_mode?: string | null
-          product?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string | null
-          data?: Json | null
-          id?: string
-          insured_client_id?: string | null
-          issue_date?: string | null
-          org_id?: string
-          owner_id?: string
-          paying_years?: number | null
-          policy_number?: string | null
-          policy_owner_client_id?: string | null
-          premium?: number | null
-          premium_mode?: string | null
-          product?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "policies_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "policies_insured_client_id_fkey"
-            columns: ["insured_client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "policies_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "policies_policy_owner_client_id_fkey"
-            columns: ["policy_owner_client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
