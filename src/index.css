@@ -77,3 +77,24 @@
 .dark .bn-editor {
   background-color: hsl(var(--background)) !important;
 }
+
+/* React Flow controls: dark mode */
+.dark .react-flow__controls {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+.dark .react-flow__controls-button {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  fill: hsl(var(--foreground)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .react-flow__controls-button:hover {
+  background: hsl(var(--muted)) !important;
+}
+
+.dark .react-flow__controls-button svg {
+  fill: hsl(var(--foreground)) !important;
+}

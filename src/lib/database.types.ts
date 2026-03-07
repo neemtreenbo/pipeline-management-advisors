@@ -540,6 +540,222 @@ export type Database = {
           },
         ]
       }
+      policies: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          data: Json | null
+          id: string
+          insured_client_id: string | null
+          issue_date: string | null
+          org_id: string
+          owner_id: string
+          paying_years: number | null
+          policy_number: string | null
+          policy_owner_client_id: string | null
+          premium: number | null
+          premium_mode: string | null
+          product: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          insured_client_id?: string | null
+          issue_date?: string | null
+          org_id: string
+          owner_id: string
+          paying_years?: number | null
+          policy_number?: string | null
+          policy_owner_client_id?: string | null
+          premium?: number | null
+          premium_mode?: string | null
+          product?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          insured_client_id?: string | null
+          issue_date?: string | null
+          org_id?: string
+          owner_id?: string
+          paying_years?: number | null
+          policy_number?: string | null
+          policy_owner_client_id?: string | null
+          premium?: number | null
+          premium_mode?: string | null
+          product?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_insured_client_id_fkey"
+            columns: ["insured_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_policy_owner_client_id_fkey"
+            columns: ["policy_owner_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_request_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_type: string | null
+          id: string
+          mime_type: string | null
+          org_id: string
+          service_request_id: string
+          size_bytes: number | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_type?: string | null
+          id?: string
+          mime_type?: string | null
+          org_id: string
+          service_request_id: string
+          size_bytes?: number | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_type?: string | null
+          id?: string
+          mime_type?: string | null
+          org_id?: string
+          service_request_id?: string
+          size_bytes?: number | null
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_request_attachments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_request_attachments_service_request_id_fkey"
+            columns: ["service_request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_requests: {
+        Row: {
+          assigned_to: string | null
+          client_id: string
+          closed_at: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          metadata: Json | null
+          org_id: string
+          owner_id: string
+          policy_id: string | null
+          priority: string
+          request_type: string
+          requested_by: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_id: string
+          closed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id: string
+          owner_id: string
+          policy_id?: string | null
+          priority?: string
+          request_type: string
+          requested_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          client_id?: string
+          closed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          org_id?: string
+          owner_id?: string
+          policy_id?: string | null
+          priority?: string
+          request_type?: string
+          requested_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_requests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assignee_id: string | null
