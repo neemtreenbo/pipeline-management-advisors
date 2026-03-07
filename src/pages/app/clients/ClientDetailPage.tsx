@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, Shield, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, Shield, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
@@ -76,6 +76,13 @@ export default function ClientDetailPage() {
     const [syncingLinkedIn, setSyncingLinkedIn] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [activeTab, setActiveTab] = useState('deals')
+    const [sidebarSections, setSidebarSections] = useState<Record<string, boolean>>({
+        contact: true,
+        record: false,
+        professional: false,
+        relationships: false,
+    })
 
     // Debounced URL saves — prevents DB write on every keystroke
     const saveLinkedIn = useCallback(async (val: string) => {
@@ -297,6 +304,10 @@ export default function ClientDetailPage() {
         }
     }
 
+    const toggleSidebarSection = useCallback((key: string) => {
+        setSidebarSections(prev => ({ ...prev, [key]: !prev[key] }))
+    }, [])
+
     if (loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -323,7 +334,7 @@ export default function ClientDetailPage() {
 
     return (
         <>
-            <Tabs defaultValue="overview" className="min-h-screen bg-background flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-screen bg-background flex flex-col">
                 <div className="sticky top-0 z-20 bg-background shadow-sm border-b border-border">
 
                     <div className="max-w-4xl mx-auto px-6 pt-4 pb-0">
@@ -509,14 +520,6 @@ export default function ClientDetailPage() {
                         {/* Tabs */}
                         <div className="pb-4">
                             <TabsList>
-                                <TabsTrigger value="overview" id="tab-overview">
-                                    <LayoutGrid size={14} className="mr-1.5" />
-                                    Overview
-                                </TabsTrigger>
-                                <TabsTrigger value="intel" id="tab-intel">
-                                    <Activity size={14} className="mr-1.5" />
-                                    Intel
-                                </TabsTrigger>
                                 <TabsTrigger value="deals" id="tab-deals">
                                     <Briefcase size={14} className="mr-1.5" />
                                     Deals
@@ -541,6 +544,10 @@ export default function ClientDetailPage() {
                                     <Activity size={14} className="mr-1.5" />
                                     Activity
                                 </TabsTrigger>
+                                <TabsTrigger value="intel" id="tab-intel">
+                                    <Activity size={14} className="mr-1.5" />
+                                    Intel
+                                </TabsTrigger>
                                 <TabsTrigger value="mindmap" id="tab-mindmap">
                                     <Brain size={14} className="mr-1.5" />
                                     Mindmap
@@ -550,59 +557,126 @@ export default function ClientDetailPage() {
                     </div>
                 </div>
 
-                <div className="max-w-4xl mx-auto px-6 py-6 w-full">
-                    {/* Overview */}
-                    <TabsContent value="overview">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
-                                <h3 className="text-sm font-semibold text-foreground">Contact Details</h3>
-                                <InfoRow label="Email" value={client.email} />
-                                <InfoRow label="Phone" value={client.phone} />
-                                <InfoRow label="Source" value={formatSource(client.source)} />
-                                <InfoRow label="Birthday" value={client.birthday ? new Date(client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null} />
-                            </div>
-                            <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
-                                <h3 className="text-sm font-semibold text-foreground">Record Info</h3>
-                                <InfoRow label="Member since" value={memberSince} />
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</span>
-                                    {(client.tags ?? []).length > 0 ? (
-                                        <div className="flex flex-wrap gap-1.5 mt-1">
-                                            {(client.tags ?? []).map(tag => (
-                                                <Badge key={tag} variant="outline">
-                                                    <Tag size={10} className="mr-1" />
-                                                    {tag}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <span className="text-sm text-muted-foreground">—</span>
-                                    )}
+                <div className="flex-1 overflow-hidden max-w-4xl mx-auto px-6 w-full">
+                <div className="flex h-full">
+                    {/* Sidebar — hidden on intel and mindmap tabs */}
+                    {activeTab !== 'mindmap' && activeTab !== 'intel' && (
+                        <aside className="w-72 shrink-0 border-r border-border overflow-y-auto bg-background pr-4 py-5 flex flex-col gap-1">
+                            {/* Contact Details */}
+                            <button
+                                onClick={() => toggleSidebarSection('contact')}
+                                className="flex items-center gap-2 w-full text-left py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                            >
+                                {sidebarSections.contact ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                Contact
+                            </button>
+                            {sidebarSections.contact && (
+                                <div className="flex flex-col gap-3 pl-5 pb-3">
+                                    <InfoRow label="Email" value={client.email} />
+                                    <InfoRow label="Phone" value={client.phone} />
+                                    <InfoRow label="Source" value={formatSource(client.source)} />
+                                    <InfoRow label="Birthday" value={client.birthday ? new Date(client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null} />
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Professional Info */}
+                            {/* Professional */}
                             {(client.company_name || client.company_industry || client.company_website || client.job_title || client.occupation) && (
-                                <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4 sm:col-span-2">
-                                    <h3 className="text-sm font-semibold text-foreground">Professional Summary</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <InfoRow label="Company" value={client.company_name} />
-                                        <InfoRow label="Industry" value={client.company_industry} />
-                                        <InfoRow label="Website" value={client.company_website} />
-                                        <InfoRow label="Job Title" value={client.job_title} />
-                                        <InfoRow label="Occupation" value={client.occupation} />
+                                <>
+                                    <button
+                                        onClick={() => toggleSidebarSection('professional')}
+                                        className="flex items-center gap-2 w-full text-left py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                                    >
+                                        {sidebarSections.professional ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                        Professional
+                                    </button>
+                                    {sidebarSections.professional && (
+                                        <div className="flex flex-col gap-3 pl-5 pb-3">
+                                            <InfoRow label="Company" value={client.company_name} />
+                                            <InfoRow label="Industry" value={client.company_industry} />
+                                            <InfoRow label="Website" value={client.company_website} />
+                                            <InfoRow label="Job Title" value={client.job_title} />
+                                            <InfoRow label="Occupation" value={client.occupation} />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Relationships */}
+                            <button
+                                onClick={() => toggleSidebarSection('relationships')}
+                                className="flex items-center gap-2 w-full text-left py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                            >
+                                {sidebarSections.relationships ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                Relationships
+                            </button>
+                            {sidebarSections.relationships && (
+                                <div className="pl-1 pb-3">
+                                    <ClientRelationships clientId={clientId!} orgId={client.org_id} />
+                                </div>
+                            )}
+
+                            {/* Record Info */}
+                            <button
+                                onClick={() => toggleSidebarSection('record')}
+                                className="flex items-center gap-2 w-full text-left py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                            >
+                                {sidebarSections.record ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                Record
+                            </button>
+                            {sidebarSections.record && (
+                                <div className="flex flex-col gap-3 pl-5 pb-3">
+                                    <InfoRow label="Member since" value={memberSince} />
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</span>
+                                        {(client.tags ?? []).length > 0 ? (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {(client.tags ?? []).map(tag => (
+                                                    <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                                                        <Tag size={8} className="mr-0.5" />
+                                                        {tag}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground">—</span>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Relationships */}
-                            <div className="sm:col-span-2">
-                                <ClientRelationships clientId={clientId!} orgId={client.org_id} />
-                            </div>
-                        </div>
+                        </aside>
+                    )}
+
+                    {/* Main content */}
+                    <div className="flex-1 overflow-y-auto pl-4 py-5">
+                    {/* Overview + Intel content moved to sidebar */}
+
+                    {/* Deals */}
+                    <TabsContent value="deals">
+                        {client && <InlineDealsList clientId={client.id} orgId={client.org_id} />}
                     </TabsContent>
 
-                    {/* Intel Tab */}
+                    {/* Policies */}
+                    <TabsContent value="policies">
+                        {client && <ClientPoliciesList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
+
+                    {/* Servicing */}
+                    <TabsContent value="servicing">
+                        {client && <ClientServiceRequestsList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
+
+                    {/* Tasks */}
+                    < TabsContent value="tasks" >
+                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} inlineAdd onActivityAdded={handleActivityAdded} />}
+                    </TabsContent >
+
+                    {/* Notes */}
+                    < TabsContent value="notes" >
+                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd onActivityAdded={handleActivityAdded} />}
+                    </TabsContent >
+
+                    {/* Intel */}
                     <TabsContent value="intel">
                         <div className="flex flex-col gap-8 animate-in fade-in duration-300 mt-2">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -615,7 +689,6 @@ export default function ClientDetailPage() {
                                         </h3>
                                         <div className="flex flex-col gap-2">
                                             <Input
-                                                id="intel-linkedin"
                                                 placeholder="https://linkedin.com/in/..."
                                                 className="bg-background"
                                                 value={client.linkedin_url || ''}
@@ -653,7 +726,6 @@ export default function ClientDetailPage() {
                                         </h3>
                                         <div className="flex flex-col gap-2">
                                             <Input
-                                                id="intel-instagram"
                                                 placeholder="https://instagram.com/..."
                                                 className="bg-background"
                                                 value={client.instagram_url || ''}
@@ -666,7 +738,6 @@ export default function ClientDetailPage() {
                                         </div>
                                     </div>
 
-                                    {/* Facebook & TikTok static Info */}
                                     {(client.facebook_url || client.tiktok_url) && (
                                         <div className="flex flex-col gap-4 pt-6 border-t border-border">
                                             <h3 className="text-sm font-medium text-foreground">Other Platforms</h3>
@@ -688,7 +759,6 @@ export default function ClientDetailPage() {
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-6">
-                                            {/* AI Summary */}
                                             {client.ai_summary ? (
                                                 <div className="flex flex-col gap-3">
                                                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -701,7 +771,6 @@ export default function ClientDetailPage() {
                                                 </div>
                                             ) : null}
 
-                                            {/* Talking Points */}
                                             {client.talking_points && (
                                                 <div className="flex flex-col gap-3">
                                                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -712,7 +781,6 @@ export default function ClientDetailPage() {
                                                         {(() => {
                                                             const tp = client.talking_points as any;
                                                             const pointsArray = Array.isArray(tp) ? tp : (tp?.items && Array.isArray(tp.items) ? tp.items : null);
-
                                                             if (pointsArray) {
                                                                 return (
                                                                     <ul className="space-y-3">
@@ -725,7 +793,6 @@ export default function ClientDetailPage() {
                                                                     </ul>
                                                                 );
                                                             }
-
                                                             return (
                                                                 <p className="text-[15px] text-foreground font-mono break-all whitespace-pre-wrap">
                                                                     {typeof tp === 'string' ? tp : JSON.stringify(tp, null, 2)}
@@ -736,11 +803,9 @@ export default function ClientDetailPage() {
                                                 </div>
                                             )}
 
-                                            {/* Raw Data Accordions / Sections */}
                                             {(client.experiences || client.education || client.updates) && (
                                                 <div className="flex flex-col gap-3">
                                                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                                                        <LayoutGrid size={16} className="text-muted-foreground" />
                                                         Additional Information
                                                     </h3>
                                                     <div className="flex flex-col gap-4">
@@ -778,31 +843,6 @@ export default function ClientDetailPage() {
                         </div>
                     </TabsContent>
 
-                    {/* Deals */}
-                    <TabsContent value="deals">
-                        {client && <InlineDealsList clientId={client.id} orgId={client.org_id} />}
-                    </TabsContent>
-
-                    {/* Policies */}
-                    <TabsContent value="policies">
-                        {client && <ClientPoliciesList clientId={client.id} orgId={client.org_id} />}
-                    </TabsContent>
-
-                    {/* Servicing */}
-                    <TabsContent value="servicing">
-                        {client && <ClientServiceRequestsList clientId={client.id} orgId={client.org_id} />}
-                    </TabsContent>
-
-                    {/* Tasks */}
-                    < TabsContent value="tasks" >
-                        {client && <EntityTasks orgId={client.org_id} clientId={client.id} inlineAdd onActivityAdded={handleActivityAdded} />}
-                    </TabsContent >
-
-                    {/* Notes */}
-                    < TabsContent value="notes" >
-                        {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd onActivityAdded={handleActivityAdded} />}
-                    </TabsContent >
-
                     {/* Activity */}
                     < TabsContent value="activity" >
                         <ActivityTimeline
@@ -816,8 +856,10 @@ export default function ClientDetailPage() {
                     <TabsContent value="mindmap">
                         <Mindmap clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} email={client.email ?? null} phone={client.phone ?? null} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
                     </TabsContent>
-                </div >
-            </Tabs >
+                    </div>
+                </div>
+                </div>
+            </Tabs>
 
         </>
     )
