@@ -1,12 +1,13 @@
 import { memo } from 'react'
 import { type NodeProps, type Node } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, DollarSign, CheckSquare, Users } from 'lucide-react'
+import { FileText, Briefcase, CheckSquare, Users } from 'lucide-react'
 
 export interface GroupNodeItem {
   label: string
   subtitle?: string
   navigateTo?: string
+  onItemClick?: () => void
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
@@ -16,7 +17,7 @@ export interface GroupNodeData extends Record<string, unknown> {
 }
 
 const ICON_MAP = {
-  deal: DollarSign,
+  deal: Briefcase,
   note: FileText,
   tasks: CheckSquare,
   relationship: Users,
@@ -50,10 +51,10 @@ export default memo(function MindmapGroupNode({ data }: NodeProps<Node<GroupNode
         {data.items.map((item, i) => (
           <div
             key={i}
-            onClick={() => item.navigateTo && navigate(item.navigateTo)}
+            onClick={() => item.onItemClick ? item.onItemClick() : item.navigateTo && navigate(item.navigateTo)}
             className={`
               flex items-center justify-between px-3 py-1.5
-              ${item.navigateTo ? 'cursor-pointer hover:bg-accent/10' : ''}
+              ${item.onItemClick || item.navigateTo ? 'cursor-pointer hover:bg-accent/10' : ''}
               ${i < data.items.length - 1 ? 'border-b border-border/30' : ''}
             `}
           >

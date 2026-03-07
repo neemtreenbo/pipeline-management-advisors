@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react'
+import { useMemo, useCallback, useRef, useEffect, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -17,6 +17,7 @@ import { useClientRelationships } from '@/hooks/queries/useClients'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { StickyNote } from 'lucide-react'
+import DealDetailsModal from '@/components/pipeline/DealDetailsModal'
 import MindmapClientNode from './MindmapClientNode'
 import MindmapGroupNode, { type GroupNodeData } from './MindmapGroupNode'
 import MindmapStickyNode from './MindmapStickyNode'
@@ -52,11 +53,13 @@ interface MindmapProps {
   clientId: string
   clientName: string
   profilePictureUrl: string | null
+  email: string | null
+  phone: string | null
   orgId: string
   clientData: Record<string, unknown> | null
 }
 
-function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientData }: MindmapProps) {
+function MindmapInner({ clientId, clientName, profilePictureUrl, email, phone, orgId, clientData }: MindmapProps) {
   const qc = useQueryClient()
   const { data: deals = [], isLoading: dealsLoading } = useDealsByClient(clientId)
   const { data: tasks = [], isLoading: tasksLoading } = useEntityTasks(orgId, 'client', clientId)
@@ -74,6 +77,9 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientDa
   const stickiesRef = useRef<MindmapSticky[]>(
     ((clientData?.mindmapStickies ?? []) as MindmapSticky[])
   )
+
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const openDealRef = useRef((id: string) => setSelectedDealId(id))
 
   const isLoading = dealsLoading || tasksLoading || notesLoading || relationshipsLoading
 
@@ -114,7 +120,7 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientDa
       id: clientId,
       type: 'mindmapClient',
       position: getPos(clientId, { x: -NODE_W / 2, y: -NODE_H / 2 }),
-      data: { clientId, name: clientName, profilePictureUrl },
+      data: { clientId, name: clientName, profilePictureUrl, email, phone },
     })
 
     if (deals.length > 0) {
@@ -124,11 +130,11 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientDa
         position: getPos('group-deals', DEFAULT_POSITIONS['group-deals']),
         data: {
           entityType: 'deal' as const,
-          title: `${deals.length} Deal${deals.length === 1 ? '' : 's'}`,
+          title: 'Deals',
           items: deals.map((d) => ({
-            label: (d.data as Record<string, unknown>)?.name as string || d.stage,
-            subtitle: `$${d.value.toLocaleString()}`,
-            navigateTo: `/app/deals/${d.id}`,
+            label: (d.data as Record<string, string>)?.title || d.stage,
+            subtitle: `₱${d.value.toLocaleString()}`,
+            onItemClick: () => openDealRef.current(d.id),
           })),
         },
       })
@@ -188,7 +194,7 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientDa
     nodes.push(...buildStickyNodes(stickiesRef.current, getPos))
 
     return nodes
-  }, [clientId, clientName, profilePictureUrl, deals, notes, tasks, relationships, buildStickyNodes])
+  }, [clientId, clientName, profilePictureUrl, email, phone, deals, notes, tasks, relationships, buildStickyNodes])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
 
@@ -355,6 +361,15 @@ function MindmapInner({ clientId, clientName, profilePictureUrl, orgId, clientDa
           }}
         />
       </ReactFlow>
+      {selectedDealId && (
+        <DealDetailsModal
+          dealId={selectedDealId}
+          onClose={() => {
+            setSelectedDealId(null)
+            qc.invalidateQueries({ queryKey: queryKeys.deals.byClient(clientId) })
+          }}
+        />
+      )}
     </div>
   )
 }

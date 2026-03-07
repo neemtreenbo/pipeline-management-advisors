@@ -780,7 +780,7 @@ export default function ClientDetailPage() {
 
                     {/* Mindmap */}
                     <TabsContent value="mindmap">
-                        <Mindmap clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
+                        <Mindmap clientId={clientId!} clientName={client.name} profilePictureUrl={client.profile_picture_url} email={client.email ?? null} phone={client.phone ?? null} orgId={client.org_id} clientData={client.data as Record<string, unknown> | null} />
                     </TabsContent>
                 </div >
             </Tabs >

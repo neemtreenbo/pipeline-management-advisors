@@ -6,6 +6,8 @@ export interface MindmapClientNodeData extends Record<string, unknown> {
   clientId: string
   name: string
   profilePictureUrl: string | null
+  email: string | null
+  phone: string | null
 }
 
 export type StickyColor = 'yellow' | 'pink' | 'blue' | 'green'
