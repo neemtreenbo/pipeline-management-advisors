@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import ClientSelector from '@/components/ui/ClientSelector'
+import ServiceRequestDetailsModal from '@/components/servicing/ServiceRequestDetailsModal'
 
 function getRequestTypeLabel(value: string) {
     return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
@@ -21,7 +22,7 @@ function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function ServiceRequestRow({ sr, onStatusChange, isDark }: { sr: ServiceRequest; onStatusChange: (id: string, status: ServiceRequestStatus) => void; isDark: boolean }) {
+function ServiceRequestRow({ sr, onStatusChange, isDark, onRowClick }: { sr: ServiceRequest; onStatusChange: (id: string, status: ServiceRequestStatus) => void; isDark: boolean; onRowClick: (id: string) => void }) {
     const [showStatusMenu, setShowStatusMenu] = useState(false)
     const statusBtnRef = useRef<HTMLButtonElement>(null)
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
@@ -30,7 +31,10 @@ function ServiceRequestRow({ sr, onStatusChange, isDark }: { sr: ServiceRequest;
     const priorityColor = SERVICE_PRIORITY_COLORS[sr.priority]
 
     return (
-        <div className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr_1fr] px-5 py-3 items-center border-b border-border/40 hover:bg-muted/20 transition-colors group">
+        <div
+            className="grid grid-cols-[1.5fr_1.5fr_1.2fr_1fr_0.8fr_1fr_1fr] px-5 py-3 items-center border-b border-border/40 hover:bg-muted/20 transition-colors group cursor-pointer"
+            onClick={() => onRowClick(sr.id)}
+        >
             {/* CLIENT */}
             <div className="flex items-center gap-2.5 min-w-0 pr-4">
                 {sr.client?.profile_picture_url ? (
@@ -57,7 +61,7 @@ function ServiceRequestRow({ sr, onStatusChange, isDark }: { sr: ServiceRequest;
             </div>
 
             {/* STATUS */}
-            <div className="pr-4 flex justify-center">
+            <div className="pr-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <button
                     ref={statusBtnRef}
                     onClick={() => {
@@ -102,7 +106,7 @@ function ServiceRequestRow({ sr, onStatusChange, isDark }: { sr: ServiceRequest;
             </div>
 
             {/* UPLOAD DOCUMENT */}
-            <div className="pr-4 flex justify-center">
+            <div className="pr-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
                 <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground/40 hover:text-accent">
                     <Upload size={14} />
                 </button>
@@ -228,7 +232,8 @@ function StageSection({
     isExpanded,
     onToggle,
     onStatusChange,
-    isDark
+    isDark,
+    onRowClick
 }: {
     status: ServiceRequestStatus;
     requests: ServiceRequest[];
@@ -236,6 +241,7 @@ function StageSection({
     onToggle: () => void;
     onStatusChange: (id: string, status: ServiceRequestStatus) => void;
     isDark: boolean;
+    onRowClick: (id: string) => void;
 }) {
     if (requests.length === 0) return null;
 
@@ -264,7 +270,7 @@ function StageSection({
             {isExpanded && (
                 <div className="mt-1 space-y-0.5 animate-in slide-in-from-top-1 duration-200">
                     {requests.map(sr => (
-                        <ServiceRequestRow key={sr.id} sr={sr} onStatusChange={onStatusChange} isDark={isDark} />
+                        <ServiceRequestRow key={sr.id} sr={sr} onStatusChange={onStatusChange} isDark={isDark} onRowClick={onRowClick} />
                     ))}
                 </div>
             )}
@@ -281,6 +287,7 @@ export default function ServicingPage() {
     const updateMutation = useUpdateServiceRequest(orgId ?? '')
     const [search, setSearch] = useState('')
     const [showModal, setShowModal] = useState(false)
+    const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
     const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>({
         'Completed': true,
         'Rejected': true
@@ -425,12 +432,21 @@ export default function ServicingPage() {
                                 onToggle={() => toggleStage(status)}
                                 onStatusChange={handleStatusChange}
                                 isDark={isDark}
+                                onRowClick={(id) => setSelectedRequestId(id)}
                             />
                         ))}
                     </Card>
                 )}
 
                 {showModal && <NewServiceRequestModal orgId={orgId} onClose={() => setShowModal(false)} />}
+                {selectedRequestId && (
+                    <ServiceRequestDetailsModal
+                        serviceRequestId={selectedRequestId}
+                        onClose={() => setSelectedRequestId(null)}
+                        onStatusChange={handleStatusChange}
+                        onDeleted={() => setSelectedRequestId(null)}
+                    />
+                )}
             </div>
         </div>
     )

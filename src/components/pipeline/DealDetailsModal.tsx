@@ -27,13 +27,12 @@ import ProposalUploader from '@/components/pipeline/ProposalUploader'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import { getDealIcon } from './DealIcon'
 import NotesList from '@/components/notes/NotesList'
-import EntityTasks from '@/components/tasks/EntityTasks'
 
 function formatCurrency(value: number) {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value)
 }
 
-type Tab = 'tasks' | 'proposals' | 'notes' | 'activity'
+type Tab = 'proposals' | 'notes' | 'activity'
 
 interface DealDetailsModalProps {
     dealId: string
@@ -52,7 +51,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
     const { data: activities = [], isLoading: activitiesLoading } = useDealActivities(dealId)
     const loading = dealLoading || attachmentsLoading || activitiesLoading
 
-    const [activeTab, setActiveTab] = useState<Tab>('tasks')
+    const [activeTab, setActiveTab] = useState<Tab>('proposals')
     const [editingStage, setEditingStage] = useState(false)
     const [editingValue, setEditingValue] = useState(false)
     const [valueDraft, setValueDraft] = useState('')
@@ -421,7 +420,7 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
 
                         {/* Tabs */}
                         <div className="px-6 flex gap-0">
-                            {(['tasks', 'proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
+                            {(['proposals', 'notes', 'activity'] as Tab[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -442,16 +441,6 @@ export default function DealDetailsModal({ dealId, onClose, onStageChange, onDel
 
                     {/* Tab content — keep mounted, toggle visibility to preserve state */}
                     <div className="overflow-y-auto px-6 py-5 flex-1">
-                        <div className={activeTab === 'tasks' ? '' : 'hidden'}>
-                            {dealId && orgId && (
-                                <EntityTasks
-                                    dealId={dealId}
-                                    orgId={orgId}
-                                    inlineAdd
-                                    onActivityAdded={() => qc.invalidateQueries({ queryKey: queryKeys.deals.activities(dealId) })}
-                                />
-                            )}
-                        </div>
                         <div className={activeTab === 'proposals' ? '' : 'hidden'}>
                             {orgId && user && (
                                 <ProposalUploader
