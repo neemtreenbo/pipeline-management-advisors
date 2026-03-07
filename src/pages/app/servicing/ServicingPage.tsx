@@ -1,30 +1,27 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Plus, ClipboardList, ChevronDown, ChevronRight, Upload, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { supabase } from '@/lib/supabase'
 import { useServiceRequests, useCreateServiceRequest, useUpdateServiceRequest } from '@/hooks/queries/useServiceRequests'
-import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES, logServiceRequestActivity } from '@/lib/service-requests'
+import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES, getRequestTypeLabel, logServiceRequestActivity } from '@/lib/service-requests'
 import type { ServiceRequest, NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType } from '@/lib/service-requests'
+import { searchClients as searchClientsApi, fetchClientPolicies, createClient } from '@/lib/clients'
+import type { ClientSummary, ClientPolicy } from '@/lib/clients'
 import { SERVICE_STATUS_COLORS, SERVICE_PRIORITY_COLORS, getAccentBg } from '@/lib/colors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import ServiceRequestDetailsModal from '@/components/servicing/ServiceRequestDetailsModal'
 
-function getRequestTypeLabel(value: string) {
-    return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
-}
-
 function getInitials(name: string) {
     if (!name) return '?'
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function ServiceRequestRow({ sr, onStatusChange, onUpdate, isDark, onRowClick }: {
+const ServiceRequestRow = memo(function ServiceRequestRow({ sr, onStatusChange, onUpdate, isDark, onRowClick }: {
     sr: ServiceRequest
     onStatusChange: (id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => void
     onUpdate: (id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) => void
@@ -181,13 +178,7 @@ function ServiceRequestRow({ sr, onStatusChange, onUpdate, isDark, onRowClick }:
 
         </div>
     )
-}
-
-interface InlineClient {
-    id: string
-    name: string
-    profile_picture_url: string | null
-}
+})
 
 function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
     orgId: string
@@ -197,13 +188,13 @@ function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
     const { user } = useAuth()
     const [step, setStep] = useState<'client' | 'details'>('client')
     const [clientSearch, setClientSearch] = useState('')
-    const [filteredClients, setFilteredClients] = useState<InlineClient[]>([])
-    const [selectedClient, setSelectedClient] = useState<InlineClient | null>(null)
+    const [filteredClients, setFilteredClients] = useState<ClientSummary[]>([])
+    const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null)
     const [requestType, setRequestType] = useState<ServiceRequestType | ''>('')
     const [title, setTitle] = useState('')
     const [saving, setSaving] = useState(false)
     const [showDropdown, setShowDropdown] = useState(false)
-    const [clientPolicies, setClientPolicies] = useState<{ id: string; policy_number: string | null; product: string | null }[]>([])
+    const [clientPolicies, setClientPolicies] = useState<ClientPolicy[]>([])
     const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
     const clientInputRef = useRef<HTMLInputElement>(null)
     const titleInputRef = useRef<HTMLInputElement>(null)
@@ -211,28 +202,23 @@ function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Server-side client search with debounce
-    const searchClients = useCallback((query: string) => {
+    const doSearchClients = useCallback((query: string) => {
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
         searchTimerRef.current = setTimeout(async () => {
-            let q = supabase
-                .from('clients')
-                .select('id, name, profile_picture_url')
-                .eq('org_id', orgId)
-                .order('name')
-                .limit(20)
-            if (query.trim()) {
-                q = q.ilike('name', `%${query.trim()}%`)
+            try {
+                const data = await searchClientsApi(orgId, query)
+                setFilteredClients(data)
+            } catch {
+                // silently ignore search errors
             }
-            const { data } = await q
-            setFilteredClients(data ?? [])
         }, 200)
     }, [orgId])
 
     // Initial load + cleanup
     useEffect(() => {
-        searchClients('')
+        doSearchClients('')
         return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-    }, [searchClients])
+    }, [doSearchClients])
 
     // Auto-focus
     useEffect(() => { clientInputRef.current?.focus() }, [])
@@ -243,32 +229,29 @@ function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
         [filteredClients, clientSearch]
     )
 
-    const handleSelectClient = useCallback(async (client: InlineClient) => {
+    const handleSelectClient = useCallback(async (client: ClientSummary) => {
         setSelectedClient(client)
         setClientSearch(client.name)
         setShowDropdown(false)
         setStep('details')
-        // Fetch policies for this client
-        const { data } = await supabase
-            .from('policies')
-            .select('id, policy_number, product')
-            .eq('org_id', orgId)
-            .eq('client_id', client.id)
-            .order('created_at', { ascending: false })
-        setClientPolicies(data ?? [])
+        try {
+            const policies = await fetchClientPolicies(orgId, client.id)
+            setClientPolicies(policies)
+        } catch {
+            setClientPolicies([])
+        }
         setSelectedPolicyId(null)
     }, [orgId])
 
     async function handleCreateClient() {
         if (!user || !clientSearch.trim()) return
-        const { data, error } = await supabase
-            .from('clients')
-            .insert({ org_id: orgId, owner_id: user.id, name: clientSearch.trim() })
-            .select('id, name, profile_picture_url')
-            .single()
-        if (error || !data) return
-        setFilteredClients(prev => [...prev, data])
-        handleSelectClient(data)
+        try {
+            const data = await createClient(orgId, user.id, clientSearch.trim())
+            setFilteredClients(prev => [...prev, data])
+            handleSelectClient(data)
+        } catch {
+            // silently ignore create errors
+        }
     }
 
     const handleSubmit = useCallback(async () => {
@@ -315,7 +298,7 @@ function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
                                     ref={clientInputRef}
                                     placeholder="Search or create client..."
                                     value={clientSearch}
-                                    onChange={(e) => { setClientSearch(e.target.value); setShowDropdown(true); searchClients(e.target.value) }}
+                                    onChange={(e) => { setClientSearch(e.target.value); setShowDropdown(true); doSearchClients(e.target.value) }}
                                     onFocus={() => setShowDropdown(true)}
                                     onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
                                     className="h-9 text-sm rounded-lg bg-muted/30 border-muted-foreground/10 focus-visible:ring-1 focus-visible:bg-background shadow-none"
@@ -448,7 +431,7 @@ function InlineAddServiceRequest({ orgId, onCreated, onCancel }: {
     )
 }
 
-function StageSection({
+const StageSection = memo(function StageSection({
     status,
     requests,
     isExpanded,
@@ -500,7 +483,7 @@ function StageSection({
             )}
         </div>
     )
-}
+})
 
 export default function ServicingPage() {
     const { user } = useAuth()
@@ -550,7 +533,7 @@ export default function ServicingPage() {
         [requestsByStage]
     )
 
-    function handleStatusChange(id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) {
+    const handleStatusChange = useCallback((id: string, status: ServiceRequestStatus, oldStatus?: ServiceRequestStatus) => {
         updateMutation.mutate({ id, updates: { status } })
         if (oldStatus && oldStatus !== status && user) {
             logServiceRequestActivity(orgId!, user.id, id, 'status_changed', {
@@ -558,18 +541,31 @@ export default function ServicingPage() {
                 to: status,
             })
         }
-    }
+    }, [updateMutation, user, orgId])
 
-    function handleInlineUpdate(id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) {
+    const handleInlineUpdate = useCallback((id: string, updates: Partial<Pick<ServiceRequest, 'title' | 'priority' | 'request_type'>>) => {
         updateMutation.mutate({ id, updates })
-    }
+    }, [updateMutation])
 
-    const toggleStage = (status: string) => {
+    const toggleStage = useCallback((status: string) => {
         setCollapsedStages(prev => ({
             ...prev,
             [status]: !prev[status]
         }))
-    }
+    }, [])
+
+    const handleRowClick = useCallback((id: string) => {
+        setSelectedRequestId(id)
+    }, [])
+
+    const handleInlineAddCreated = useCallback(async (input: NewServiceRequestInput) => {
+        await createMutation.mutateAsync(input)
+        setShowInlineAdd(false)
+    }, [createMutation])
+
+    const handleInlineAddCancel = useCallback(() => {
+        setShowInlineAdd(false)
+    }, [])
 
     if (!user || !orgId) return null
 
@@ -653,11 +649,8 @@ export default function ServicingPage() {
                             {showInlineAdd && (
                                 <InlineAddServiceRequest
                                     orgId={orgId!}
-                                    onCreated={async (input) => {
-                                        await createMutation.mutateAsync(input)
-                                        setShowInlineAdd(false)
-                                    }}
-                                    onCancel={() => setShowInlineAdd(false)}
+                                    onCreated={handleInlineAddCreated}
+                                    onCancel={handleInlineAddCancel}
                                 />
                             )}
                         </AnimatePresence>
@@ -683,7 +676,7 @@ export default function ServicingPage() {
                                 onStatusChange={handleStatusChange}
                                 onUpdate={handleInlineUpdate}
                                 isDark={isDark}
-                                onRowClick={(id) => setSelectedRequestId(id)}
+                                onRowClick={handleRowClick}
                             />
                         ))}
                     </Card>

@@ -46,6 +46,11 @@ export const SERVICE_REQUEST_STATUSES: ServiceRequestStatus[] = [
     'Rejected',
 ]
 
+/** Get human-readable label for a service request type */
+export function getRequestTypeLabel(value: string): string {
+    return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
+}
+
 export const SERVICE_REQUEST_PRIORITIES: ServiceRequestPriority[] = [
     'low',
     'medium',
@@ -222,8 +227,16 @@ export async function updateServiceRequest(
     if (error) throw error
 }
 
-/** Delete a service request */
-export async function deleteServiceRequest(id: string): Promise<void> {
+/** Delete a service request and all related data (attachments, activities, links) */
+export async function deleteServiceRequest(id: string, attachmentStoragePaths?: string[]): Promise<void> {
+    // Clean up storage files
+    if (attachmentStoragePaths && attachmentStoragePaths.length > 0) {
+        await supabase.storage.from('service-request-files').remove(attachmentStoragePaths)
+    }
+    // Clean up related rows
+    await supabase.from('activities').delete().eq('entity_id', id).eq('entity_type', 'service_request')
+    await supabase.from('links').delete().or(`from_id.eq.${id},to_id.eq.${id}`)
+    // Delete the service request itself
     const { error } = await supabase
         .from('service_requests')
         .delete()

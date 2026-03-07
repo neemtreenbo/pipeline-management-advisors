@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Send, MessageCircle } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
@@ -123,6 +123,12 @@ export default function CommentThread({ entityType, entityId, onCommentCreated }
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const commentsEndRef = useRef<HTMLDivElement>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Filter members for mention dropdown (exclude self, match query)
   const mentionSuggestions = useMemo(() => {
@@ -162,6 +168,7 @@ export default function CommentThread({ entityType, entityId, onCommentCreated }
 
     // Re-focus textarea
     requestAnimationFrame(() => {
+      if (!mountedRef.current) return
       if (textareaRef.current) {
         const pos = before.length + name.length + 2 // +2 for @ and space
         textareaRef.current.focus()
@@ -187,6 +194,7 @@ export default function CommentThread({ entityType, entityId, onCommentCreated }
       onCommentCreated?.(comment)
       // Scroll to bottom
       requestAnimationFrame(() => {
+        if (!mountedRef.current) return
         commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       })
     } catch (err) {

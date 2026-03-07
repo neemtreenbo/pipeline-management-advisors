@@ -6,8 +6,8 @@ import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { ACCENT_PALETTE, getAccentBg } from '@/lib/colors'
 import { createNote } from '@/lib/notes'
-import type { Note, NoteClientInfo } from '@/lib/notes'
-import { useAllNotes, useNoteClientInfo } from '@/hooks/queries/useNotes'
+import type { Note } from '@/lib/notes'
+import { useNotesWithClients } from '@/hooks/queries/useNotes'
 import { extractTextFromContent } from '@/lib/extract-text'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -102,16 +102,23 @@ export default function NotesPage() {
     const { orgId } = useOrg()
     const navigate = useNavigate()
 
-    const { data: notes = [], isLoading: loading } = useAllNotes(orgId ?? undefined)
+    const { data: notesWithClients = [], isLoading: loading } = useNotesWithClients(orgId ?? undefined)
 
-    const noteIds = useMemo(() => notes.map(n => n.id), [notes])
-    const { data: clientInfoList = [] } = useNoteClientInfo(noteIds)
+    const notes = notesWithClients as Note[]
 
     const noteClients = useMemo(() => {
-        const map: Record<string, NoteClientInfo> = {}
-        clientInfoList.forEach(c => { map[c.noteId] = c })
+        const map: Record<string, { clientId: string; clientName: string; profilePictureUrl: string | null }> = {}
+        notesWithClients.forEach(n => {
+            if (n.client_id && n.client_name) {
+                map[n.id] = {
+                    clientId: n.client_id,
+                    clientName: n.client_name,
+                    profilePictureUrl: n.profile_picture_url ?? null,
+                }
+            }
+        })
         return map
-    }, [clientInfoList])
+    }, [notesWithClients])
 
     const handleCreateNote = useCallback(async () => {
         if (!orgId || !user) return
@@ -236,7 +243,7 @@ export default function NotesPage() {
                     ) : (
                         <div className="flex flex-col">
                             {sortedGroups.map((group, i) => (
-                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0} colorIndex={i} />
+                                <ClientNoteGroup key={group.id} clientId={group.id} clientName={group.name} profilePictureUrl={group.profilePictureUrl} notes={group.notes} defaultExpanded={i === 0 && !(group.id === 'unassigned' && group.notes.length > 10)} colorIndex={i} />
                             ))}
                         </div>
                     )}

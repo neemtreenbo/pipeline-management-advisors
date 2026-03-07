@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   getNotesByOrgPaginated, getNoteById, createNote, updateNote,
   deleteNote, getNotesLinkedToEntity, getClientsForNotes,
-  linkNoteToEntity, unlinkNoteFromEntity,
+  getNotesWithClients, linkNoteToEntity, unlinkNoteFromEntity,
 } from '@/lib/notes'
 import type { Note } from '@/lib/notes'
 
@@ -39,6 +39,14 @@ export function useAllNotes(orgId: string | undefined) {
       }
       return allData
     },
+    enabled: !!orgId,
+  })
+}
+
+export function useNotesWithClients(orgId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notes.withClients(orgId!),
+    queryFn: () => getNotesWithClients(orgId!),
     enabled: !!orgId,
   })
 }

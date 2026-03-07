@@ -3,8 +3,10 @@ import { Plus, ClipboardList, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useServiceRequestsByClient, useCreateServiceRequest, useUpdateServiceRequest, useDeleteServiceRequest } from '@/hooks/queries/useServiceRequests'
-import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES } from '@/lib/service-requests'
+import { SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, SERVICE_REQUEST_PRIORITIES, getRequestTypeLabel } from '@/lib/service-requests'
 import type { ServiceRequest, NewServiceRequestInput, ServiceRequestStatus, ServiceRequestType, ServiceRequestPriority } from '@/lib/service-requests'
+import { SERVICE_STATUS_COLORS, getAccentBg } from '@/lib/colors'
+import { useTheme } from '@/contexts/ThemeContext'
 import { queryKeys } from '@/lib/queryKeys'
 
 interface ClientServiceRequestsListProps {
@@ -12,26 +14,14 @@ interface ClientServiceRequestsListProps {
     orgId: string
 }
 
-const STATUS_COLORS: Record<string, string> = {
-    'New': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    'Pending Documents': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-    'Ready to Submit': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-    'Submitted': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-    'In Progress': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    'Completed': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-    'Rejected': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-}
-
-function getRequestTypeLabel(value: string) {
-    return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
-}
-
-function ServiceRequestItem({ sr, onStatusChange, onDelete }: {
+function ServiceRequestItem({ sr, onStatusChange, onDelete, isDark }: {
     sr: ServiceRequest
     onStatusChange: (id: string, status: ServiceRequestStatus) => void
     onDelete: (id: string) => void
+    isDark: boolean
 }) {
     const [showStatusMenu, setShowStatusMenu] = useState(false)
+    const statusColor = SERVICE_STATUS_COLORS[sr.status]
 
     return (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3">
@@ -43,7 +33,7 @@ function ServiceRequestItem({ sr, onStatusChange, onDelete }: {
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-[11px] text-muted-foreground/40">{getRequestTypeLabel(sr.request_type)}</span>
                     <span className="text-[11px] text-muted-foreground/40">
-                        {new Date(sr.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                        {new Date(sr.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                     {sr.description && (
                         <span className="text-[11px] text-muted-foreground/40 truncate max-w-[200px]">{sr.description}</span>
@@ -54,7 +44,8 @@ function ServiceRequestItem({ sr, onStatusChange, onDelete }: {
                 <div className="relative">
                     <button
                         onClick={() => setShowStatusMenu(!showStatusMenu)}
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer ${STATUS_COLORS[sr.status] || 'bg-muted text-muted-foreground'}`}
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer text-white/90"
+                        style={statusColor ? { backgroundColor: getAccentBg(statusColor, isDark) } : undefined}
                     >
                         {sr.status}
                     </button>
@@ -88,6 +79,8 @@ function ServiceRequestItem({ sr, onStatusChange, onDelete }: {
 
 export default function ClientServiceRequestsList({ clientId, orgId }: ClientServiceRequestsListProps) {
     const { user } = useAuth()
+    const { theme } = useTheme()
+    const isDark = theme === 'dark'
     const qc = useQueryClient()
     const { data: requests = [], isLoading } = useServiceRequestsByClient(clientId)
     const createMutation = useCreateServiceRequest(orgId)
@@ -195,7 +188,7 @@ export default function ClientServiceRequestsList({ clientId, orgId }: ClientSer
             ) : (
                 <div className="flex flex-col gap-2">
                     {requests.map(sr => (
-                        <ServiceRequestItem key={sr.id} sr={sr} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+                        <ServiceRequestItem key={sr.id} sr={sr} onStatusChange={handleStatusChange} onDelete={handleDelete} isDark={isDark} />
                     ))}
                 </div>
             )}

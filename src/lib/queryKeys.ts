@@ -22,6 +22,7 @@ export const queryKeys = {
     byEntity: (entityType: string, entityId: string) =>
       ['notes', 'byEntity', entityType, entityId] as const,
     clientInfo: (noteIds: string[]) => ['notes', 'clientInfo', ...noteIds] as const,
+    withClients: (orgId: string) => ['notes', 'withClients', orgId] as const,
   },
   tasks: {
     all: (orgId: string) => ['tasks', orgId] as const,

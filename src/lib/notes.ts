@@ -334,6 +334,18 @@ export type NoteClientInfo = {
     profilePictureUrl: string | null
 }
 
+export interface NoteWithClient extends Note {
+    client_id: string | null
+    client_name: string | null
+    profile_picture_url: string | null
+}
+
+export async function getNotesWithClients(orgId: string): Promise<NoteWithClient[]> {
+    const { data, error } = await supabase.rpc('get_notes_with_clients', { p_org_id: orgId })
+    if (error) throw error
+    return (data ?? []) as NoteWithClient[]
+}
+
 export async function getClientsForNotes(noteIds: string[]): Promise<NoteClientInfo[]> {
     if (!noteIds.length) return []
 

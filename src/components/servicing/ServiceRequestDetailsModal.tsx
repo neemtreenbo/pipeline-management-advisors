@@ -12,11 +12,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { useOrg } from '@/contexts/OrgContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { supabase } from '@/lib/supabase'
 import {
     SERVICE_REQUEST_STATUSES,
     SERVICE_REQUEST_PRIORITIES,
-    SERVICE_REQUEST_TYPES,
+    getRequestTypeLabel,
     updateServiceRequest,
     deleteServiceRequest,
     logServiceRequestActivity,
@@ -30,10 +29,6 @@ import CommentThread from '@/components/comments/CommentThread'
 import ActivityTimeline from '@/components/pipeline/ActivityTimeline'
 import type { ActivityRecord } from '@/components/pipeline/ActivityTimeline'
 import { useComments } from '@/hooks/queries/useComments'
-
-function getRequestTypeLabel(value: string) {
-    return SERVICE_REQUEST_TYPES.find(t => t.value === value)?.label ?? value
-}
 
 type Tab = 'documents' | 'comments' | 'activity'
 
@@ -130,15 +125,8 @@ export default function ServiceRequestDetailsModal({
         if (!sr || !orgId) return
         setDeleting(true)
         try {
-            // Remove storage files
             const storagePaths = attachments.map((a) => a.storage_path).filter(Boolean)
-            if (storagePaths.length > 0) {
-                await supabase.storage.from('service-request-files').remove(storagePaths)
-            }
-            // Clean up related rows
-            await supabase.from('activities').delete().eq('entity_id', sr.id).eq('entity_type', 'service_request')
-            await supabase.from('links').delete().or(`from_id.eq.${sr.id},to_id.eq.${sr.id}`)
-            await deleteServiceRequest(sr.id)
+            await deleteServiceRequest(sr.id, storagePaths)
             onDeleted?.(sr.id)
             onClose()
         } catch (err) {

@@ -28,6 +28,49 @@ const FILE_ICON: Record<string, React.ReactNode> = {
     'image/jpg': <Image size={16} className="text-blue-500" />,
 }
 
+function AttachmentItem({ a, onView, onDelete, deletingId }: {
+    a: ServiceRequestAttachment
+    onView: (storagePath: string) => void
+    onDelete: (id: string, storagePath: string) => void
+    deletingId: string | null
+}) {
+    return (
+        <div className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors shadow-sm">
+            <div className="shrink-0">
+                {FILE_ICON[a.mime_type ?? ''] ?? <FileText size={16} className="text-muted-foreground" />}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{a.file_name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatFileSize(a.size_bytes)} ·{' '}
+                    {new Date(a.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                    })}
+                </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+                <button
+                    onClick={() => onView(a.storage_path)}
+                    title="View / Download"
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                >
+                    <ExternalLink size={15} />
+                </button>
+                <button
+                    onClick={() => onDelete(a.id, a.storage_path)}
+                    disabled={deletingId === a.id}
+                    title="Delete"
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                >
+                    <Trash2 size={15} />
+                </button>
+            </div>
+        </div>
+    )
+}
+
 export default function ServiceRequestDocumentUploader({
     serviceRequestId,
     orgId,
@@ -105,46 +148,6 @@ export default function ServiceRequestDocumentUploader({
         }
     }
 
-    function AttachmentItem({ a }: { a: ServiceRequestAttachment }) {
-        return (
-            <div
-                className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors shadow-sm"
-            >
-                <div className="shrink-0">
-                    {FILE_ICON[a.mime_type ?? ''] ?? <FileText size={16} className="text-muted-foreground" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{a.file_name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        {formatFileSize(a.size_bytes)} ·{' '}
-                        {new Date(a.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                        })}
-                    </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    <button
-                        onClick={() => handleView(a.storage_path)}
-                        title="View / Download"
-                        className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                    >
-                        <ExternalLink size={15} />
-                    </button>
-                    <button
-                        onClick={() => handleDelete(a.id, a.storage_path)}
-                        disabled={deletingId === a.id}
-                        title="Delete"
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                    >
-                        <Trash2 size={15} />
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className="flex flex-col gap-6">
             {/* Dropzone */}
@@ -188,7 +191,7 @@ export default function ServiceRequestDocumentUploader({
                         Documents <span className="bg-muted px-2 py-0.5 rounded-full text-[10px]">{attachments.length}</span>
                     </h4>
                     <div className="grid gap-2">
-                        {attachments.map((a) => <AttachmentItem key={a.id} a={a} />)}
+                        {attachments.map((a) => <AttachmentItem key={a.id} a={a} onView={handleView} onDelete={handleDelete} deletingId={deletingId} />)}
                     </div>
                 </div>
             ) : (
