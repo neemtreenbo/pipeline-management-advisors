@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
+import { createClient as createClientLib, updateClient as updateClientLib, deleteClient as deleteClientLib } from '@/lib/clients'
 import {
   fetchClientRelationships,
   fetchAllClientRelationships,
@@ -89,13 +90,7 @@ export function useCreateClient(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { name: string; owner_id: string; email?: string; phone?: string; source?: string; tags?: string[] }) => {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert({ org_id: orgId, ...input })
-        .select()
-        .single()
-      if (error) throw error
-      return data
+      return createClientLib({ org_id: orgId, ...input })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.clients.list(orgId) })
@@ -106,22 +101,24 @@ export function useCreateClient(orgId: string) {
 export function useUpdateClient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; [key: string]: unknown }) => {
-      const { error } = await supabase.from('clients').update(patch).eq('id', id)
-      if (error) throw error
+    mutationFn: async ({ id, _actorId, _orgId, ...patch }: { id: string; _actorId?: string; _orgId?: string; [key: string]: unknown }) => {
+      if (_actorId && _orgId) {
+        await updateClientLib(id, patch, _actorId, _orgId)
+      } else {
+        const { error } = await supabase.from('clients').update(patch).eq('id', id)
+        if (error) throw error
+      }
     },
-    onMutate: async ({ id, ...patch }) => {
-      // Cancel outgoing refetches so they don't overwrite our optimistic update
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onMutate: async ({ id, _actorId, _orgId, ...patch }) => {
       await qc.cancelQueries({ queryKey: queryKeys.clients.detail(id) })
       const previous = qc.getQueryData(queryKeys.clients.detail(id))
-      // Optimistically merge the patch into the cached client
       if (previous) {
         qc.setQueryData(queryKeys.clients.detail(id), { ...previous as object, ...patch })
       }
       return { previous, id }
     },
     onError: (_err, _vars, context) => {
-      // Rollback on error
       if (context?.previous) {
         qc.setQueryData(queryKeys.clients.detail(context.id), context.previous)
       }
@@ -136,9 +133,18 @@ export function useUpdateClient() {
 export function useDeleteClient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('clients').delete().eq('id', id)
-      if (error) throw error
+    mutationFn: async (input: { id: string; name?: string; actorId?: string; orgId?: string } | string) => {
+      if (typeof input === 'string') {
+        const { error } = await supabase.from('clients').delete().eq('id', input)
+        if (error) throw error
+      } else {
+        if (input.actorId && input.orgId) {
+          await deleteClientLib(input.id, input.name ?? 'Unknown', input.actorId, input.orgId)
+        } else {
+          const { error } = await supabase.from('clients').delete().eq('id', input.id)
+          if (error) throw error
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients'] })

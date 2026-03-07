@@ -156,6 +156,17 @@ export async function updateTask(id: string, updates: TaskUpdate) {
         updates.completed_at = null
     }
 
+    // Check if assignee is changing for activity logging
+    let oldAssigneeId: string | null | undefined
+    if (updates.assignee_id !== undefined) {
+        const { data: existing } = await supabase
+            .from('tasks')
+            .select('assignee_id')
+            .eq('id', id)
+            .maybeSingle()
+        oldAssigneeId = existing?.assignee_id
+    }
+
     const { data, error } = await supabase
         .from('tasks')
         .update(updates)
@@ -165,12 +176,12 @@ export async function updateTask(id: string, updates: TaskUpdate) {
 
     if (error) throw error
 
-    // Log complete/uncomplete activities
-    if (updates.status && data) {
-        const { data: userData } = await supabase.auth.getUser()
-        const actorId = userData.user?.id
+    const { data: userData } = await supabase.auth.getUser()
+    const actorId = userData.user?.id
 
-        if (actorId && data.org_id) {
+    if (actorId && data.org_id) {
+        // Log complete/uncomplete activities
+        if (updates.status) {
             if (updates.status === 'completed') {
                 await supabase.from('activities').insert({
                     org_id: data.org_id,
@@ -181,7 +192,6 @@ export async function updateTask(id: string, updates: TaskUpdate) {
                     data: { title: data.title },
                 })
             } else if (updates.status === 'todo') {
-                // For when a task is uncompleted after being completed
                 await supabase.from('activities').insert({
                     org_id: data.org_id,
                     actor_id: actorId,
@@ -192,12 +202,44 @@ export async function updateTask(id: string, updates: TaskUpdate) {
                 })
             }
         }
+
+        // Log assignment change
+        if (updates.assignee_id !== undefined && updates.assignee_id !== oldAssigneeId) {
+            await supabase.from('activities').insert({
+                org_id: data.org_id,
+                actor_id: actorId,
+                entity_type: 'task',
+                entity_id: data.id,
+                event_type: 'task_assigned',
+                data: { title: data.title, assignee_id: updates.assignee_id },
+            })
+        }
     }
 
     return data as Task
 }
 
-export async function deleteTask(id: string) {
+export async function deleteTask(id: string, actorId?: string, orgId?: string) {
+    // Log deletion before deleting
+    if (actorId && orgId) {
+        const { data: task } = await supabase
+            .from('tasks')
+            .select('title')
+            .eq('id', id)
+            .maybeSingle()
+
+        if (task) {
+            await supabase.from('activities').insert({
+                org_id: orgId,
+                actor_id: actorId,
+                entity_type: 'task',
+                entity_id: id,
+                event_type: 'task_deleted',
+                data: { title: task.title },
+            })
+        }
+    }
+
     const { error } = await supabase
         .from('tasks')
         .delete()

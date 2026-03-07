@@ -31,6 +31,16 @@ export const queryKeys = {
     links: (taskId: string) => ['tasks', 'links', taskId] as const,
     clientInfo: (taskIds: string[]) => ['tasks', 'clientInfo', ...taskIds] as const,
   },
+  serviceRecords: {
+    all: (orgId: string) => ['serviceRecords', orgId] as const,
+    byClient: (clientId: string) => ['serviceRecords', 'byClient', clientId] as const,
+    detail: (id: string) => ['serviceRecords', 'detail', id] as const,
+  },
+  activities: {
+    orgFeed: (orgId: string) => ['activities', 'orgFeed', orgId] as const,
+    byEntity: (entityType: string, entityId: string) => ['activities', entityType, entityId] as const,
+    orgMembers: (orgId: string) => ['activities', 'orgMembers', orgId] as const,
+  },
   attachments: {
     byDeal: (dealId: string) => ['attachments', dealId] as const,
   },

@@ -11,16 +11,20 @@ export interface ActivityRecord {
     data: Record<string, unknown>
     created_at: string
     actor_id: string
+    actor?: { full_name: string; avatar_url: string | null }
 }
 
 interface ActivityTimelineProps {
     activities: ActivityRecord[]
     contextDeals?: { id: string; name: string }[]
+    showActorNames?: boolean
 }
 
 const EVENT_LABELS: Record<string, string> = {
     deal_created: 'Deal created',
     deal_stage_changed: 'Stage changed',
+    deal_value_changed: 'Deal value changed',
+    deal_deleted: 'Deal deleted',
     proposal_uploaded: 'Proposal uploaded',
     note_created: 'Note added',
     note_linked: 'Note linked',
@@ -28,6 +32,14 @@ const EVENT_LABELS: Record<string, string> = {
     task_created: 'Task added',
     task_completed: 'Task completed',
     task_uncompleted: 'Task reopened',
+    task_assigned: 'Task assigned',
+    task_deleted: 'Task deleted',
+    client_created: 'Client created',
+    client_edited: 'Client edited',
+    client_deleted: 'Client deleted',
+    service_created: 'Service record created',
+    service_completed: 'Service completed',
+    service_status_changed: 'Service status changed',
 }
 
 function getLabel(eventType: string) {
@@ -44,10 +56,20 @@ function getDetail(activity: ActivityRecord): React.ReactNode {
             return (
                 <span className="inline-flex items-center gap-1">
                     <span className="text-muted-foreground/60">{d.from_stage as string}</span>
-                    <span className="text-muted-foreground/30">→</span>
+                    <span className="text-muted-foreground/30">&rarr;</span>
                     <span className="text-foreground/70 font-medium">{d.to_stage as string}</span>
                 </span>
             )
+        case 'deal_value_changed':
+            return (
+                <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground/60">${Number(d.from_value).toLocaleString()}</span>
+                    <span className="text-muted-foreground/30">&rarr;</span>
+                    <span className="text-foreground/70 font-medium">${Number(d.to_value).toLocaleString()}</span>
+                </span>
+            )
+        case 'deal_deleted':
+            return d.title ? `"${d.title as string}"` : null
         case 'proposal_uploaded':
             return d.file_name ? (d.file_name as string) : null
         case 'note_created':
@@ -67,7 +89,28 @@ function getDetail(activity: ActivityRecord): React.ReactNode {
         case 'task_created':
         case 'task_completed':
         case 'task_uncompleted':
+        case 'task_assigned':
+        case 'task_deleted':
             return (d.title as string) || null
+        case 'client_created':
+        case 'client_deleted':
+            return (d.name as string) || null
+        case 'client_edited': {
+            const fields = d.changed_fields as string[] | undefined
+            return fields ? `Fields: ${fields.join(', ')}` : null
+        }
+        case 'service_created':
+            return d.title ? `"${d.title as string}"` : null
+        case 'service_completed':
+            return d.title ? `"${d.title as string}"` : null
+        case 'service_status_changed':
+            return (
+                <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground/60">{d.from_status as string}</span>
+                    <span className="text-muted-foreground/30">&rarr;</span>
+                    <span className="text-foreground/70 font-medium">{d.to_status as string}</span>
+                </span>
+            )
         default:
             return null
     }
@@ -101,6 +144,8 @@ function formatAbsolute(dateStr: string): string {
 const EVENT_DOT_COLORS: Record<string, typeof ACCENT_PALETTE[keyof typeof ACCENT_PALETTE]> = {
     deal_created:       ACCENT_PALETTE.blue,
     deal_stage_changed: ACCENT_PALETTE.purple,
+    deal_value_changed: ACCENT_PALETTE.purple,
+    deal_deleted:       ACCENT_PALETTE.red,
     proposal_uploaded:  ACCENT_PALETTE.orange,
     note_created:       ACCENT_PALETTE.gold,
     note_linked:        ACCENT_PALETTE.gold,
@@ -108,9 +153,17 @@ const EVENT_DOT_COLORS: Record<string, typeof ACCENT_PALETTE[keyof typeof ACCENT
     task_created:       ACCENT_PALETTE.teal,
     task_completed:     ACCENT_PALETTE.green,
     task_uncompleted:   ACCENT_PALETTE.cyan,
+    task_assigned:      ACCENT_PALETTE.teal,
+    task_deleted:       ACCENT_PALETTE.red,
+    client_created:     ACCENT_PALETTE.blue,
+    client_edited:      ACCENT_PALETTE.purple,
+    client_deleted:     ACCENT_PALETTE.red,
+    service_created:    ACCENT_PALETTE.orange,
+    service_completed:  ACCENT_PALETTE.green,
+    service_status_changed: ACCENT_PALETTE.orange,
 }
 
-export default function ActivityTimeline({ activities, contextDeals }: ActivityTimelineProps) {
+export default function ActivityTimeline({ activities, contextDeals, showActorNames = false }: ActivityTimelineProps) {
     const { theme } = useTheme()
     const isDark = theme === 'dark'
 
@@ -130,6 +183,7 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                 const isLast = idx === activities.length - 1
                 const dealContext = contextDeals?.find(d => d.id === activity.entity_id)
                 const isDealActivity = activity.entity_type === 'deal' && !!dealContext
+                const actorName = showActorNames && activity.actor?.full_name
 
                 return (
                     <div key={activity.id} className="flex gap-3">
@@ -152,7 +206,6 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                                 <div className="min-w-0 flex-1">
 
                                     {isDealActivity ? (
-                                        // Client context: deal name is the primary anchor, event is secondary
                                         <>
                                             <Link
                                                 to={`/app/pipeline?deal=${activity.entity_id}`}
@@ -164,14 +217,13 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                                                 {getLabel(activity.event_type)}
                                                 {detail && (
                                                     <>
-                                                        <span className="mx-1 text-muted-foreground/30">·</span>
+                                                        <span className="mx-1 text-muted-foreground/30">&middot;</span>
                                                         <span className="text-[12px]">{detail}</span>
                                                     </>
                                                 )}
                                             </p>
                                         </>
                                     ) : (
-                                        // Deal modal context or non-deal activity: event label is primary
                                         <>
                                             <p className="text-[13px] font-medium text-foreground/80 leading-snug">
                                                 {getLabel(activity.event_type)}
@@ -182,6 +234,12 @@ export default function ActivityTimeline({ activities, contextDeals }: ActivityT
                                                 </p>
                                             )}
                                         </>
+                                    )}
+
+                                    {actorName && (
+                                        <p className="text-[11px] text-muted-foreground/50 mt-0.5">
+                                            by {actorName}
+                                        </p>
                                     )}
 
                                 </div>

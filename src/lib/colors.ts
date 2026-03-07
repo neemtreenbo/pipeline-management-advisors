@@ -30,6 +30,7 @@ export const ACCENT_PALETTE = {
     orange: { bg: 'hsl(28, 60%, 62%)',  bgDark: 'hsl(28, 45%, 42%)' },
     purple: { bg: 'hsl(280, 40%, 65%)', bgDark: 'hsl(280, 30%, 42%)' },
     green:  { bg: 'hsl(142, 45%, 55%)', bgDark: 'hsl(142, 35%, 38%)' },
+    red:    { bg: 'hsl(0, 55%, 65%)',   bgDark: 'hsl(0, 45%, 42%)' },
 } as const satisfies Record<string, AccentColor>
 
 /** Resolve the theme-appropriate background for a palette entry. */

@@ -119,12 +119,26 @@ export async function updateDealStage(dealId: string, stage: DealStage, orderInd
 /** Update deal info fields */
 export async function updateDeal(
     dealId: string,
-    updates: Partial<Pick<Deal, 'value' | 'expected_close_date' | 'due_date' | 'stage'>> & { title?: string }
+    updates: Partial<Pick<Deal, 'value' | 'expected_close_date' | 'due_date' | 'stage'>> & { title?: string },
+    actorId?: string,
+    orgId?: string
 ): Promise<void> {
+    // Fetch old values for activity logging
+    let oldValue: number | undefined
+    if (actorId && orgId && updates.value !== undefined) {
+        const { data: existing } = await supabase
+            .from('deals')
+            .select('value')
+            .eq('id', dealId)
+            .maybeSingle()
+        if (existing) {
+            oldValue = existing.value as number
+        }
+    }
+
     const { title, ...rest } = updates
     const patch: Record<string, unknown> = { ...rest }
     if (title !== undefined) {
-        // read current data first
         const { data: existing } = await supabase
             .from('deals')
             .select('data')
@@ -133,6 +147,31 @@ export async function updateDeal(
         patch.data = { ...(existing?.data ?? {}), title }
     }
     const { error } = await supabase.from('deals').update(patch).eq('id', dealId)
+    if (error) throw error
+
+    // Log value change
+    if (actorId && orgId && updates.value !== undefined && oldValue !== undefined && updates.value !== oldValue) {
+        await logDealActivity(orgId, actorId, dealId, 'deal_value_changed', {
+            from_value: oldValue,
+            to_value: updates.value,
+        })
+    }
+}
+
+/** Delete a deal and log activity */
+export async function deleteDeal(dealId: string, actorId: string, orgId: string): Promise<void> {
+    // Fetch deal title before deletion
+    const { data: deal } = await supabase
+        .from('deals')
+        .select('data')
+        .eq('id', dealId)
+        .maybeSingle()
+
+    const title = (deal?.data as Record<string, unknown>)?.title as string | undefined
+
+    await logDealActivity(orgId, actorId, dealId, 'deal_deleted', { title: title ?? 'Unknown' })
+
+    const { error } = await supabase.from('deals').delete().eq('id', dealId)
     if (error) throw error
 }
 

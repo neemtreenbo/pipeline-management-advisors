@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
+import { fetchClientActivities, type ActivityWithActor } from '@/lib/activities'
 import { useDebouncedSave } from '@/hooks/useDebouncedSave'
 import { useClientDetail, type ClientListItem } from '@/hooks/queries/useClients'
 import { useDealsByClient } from '@/hooks/queries/useDeals'
@@ -20,6 +21,7 @@ import InlineDealsList from '@/components/pipeline/InlineDealsList'
 import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
 import ClientRelationships from '@/components/clients/ClientRelationships'
+import ServiceRecordList from '@/components/service/ServiceRecordList'
 import Mindmap from '@/components/mindmap'
 
 function formatSource(src: string | null) {
@@ -61,9 +63,7 @@ export default function ClientDetailPage() {
     const { data: client = null, isLoading: clientLoading, isError: notFound } = useClientDetail(clientId)
     const { data: deals = [], isLoading: dealsLoading } = useDealsByClient(clientId)
     const loading = clientLoading || dealsLoading
-    const [activities, setActivities] = useState<Array<{
-        id: string; event_type: string; entity_type: string; entity_id: string; data: Record<string, unknown>; created_at: string; actor_id: string
-    }>>([])
+    const [activities, setActivities] = useState<ActivityWithActor[]>([])
 
     // Edit state
     const [editing, setEditing] = useState(false)
@@ -88,8 +88,8 @@ export default function ClientDetailPage() {
     const debouncedSaveInstagram = useDebouncedSave(saveInstagram)
 
     const handleActivityAdded = useCallback((a: { id: string; event_type: string; entity_type?: string; entity_id?: string; data: Record<string, unknown>; created_at: string; actor_id: string }) => {
-        setActivities(prev => [{ ...a, entity_type: a.entity_type ?? '', entity_id: a.entity_id ?? '' }, ...prev])
-    }, [])
+        setActivities(prev => [{ ...a, org_id: client?.org_id ?? '', entity_type: a.entity_type ?? '', entity_id: a.entity_id ?? '' } as ActivityWithActor, ...prev])
+    }, [client?.org_id])
 
     const contextDeals = useMemo(
         () => deals.map(d => ({ id: d.id, name: (d.data as Record<string, string>)?.title || client?.name || 'Deal' })),
@@ -113,44 +113,10 @@ export default function ClientDetailPage() {
     // Fetch aggregated activities when client + deals are loaded
     useEffect(() => {
         if (!client || !clientId) return
-        const dealIds = deals.map(d => d.id)
 
-        async function fetchActivities() {
-            let orLinkQuery = `and(to_type.eq.client,to_id.eq.${clientId})`
-            if (dealIds.length > 0) {
-                orLinkQuery += `,and(to_type.eq.deal,to_id.in.(${dealIds.join(',')}))`
-            }
-            const { data: links } = await supabase
-                .from('links')
-                .select('from_id, from_type')
-                .in('from_type', ['note', 'task'])
-                .or(orLinkQuery)
-
-            const noteIds = Array.from(new Set(links?.filter(l => l.from_type === 'note').map(l => l.from_id) || []))
-            const taskIds = Array.from(new Set(links?.filter(l => l.from_type === 'task').map(l => l.from_id) || []))
-
-            let query = supabase
-                .from('activities')
-                .select('*')
-                .order('created_at', { ascending: false })
-
-            const chunks = [`and(entity_type.eq.client,entity_id.eq.${clientId})`]
-            if (dealIds.length > 0) {
-                chunks.push(`and(entity_type.eq.deal,entity_id.in.(${dealIds.join(',')}))`)
-            }
-            if (noteIds.length > 0) {
-                chunks.push(`and(entity_type.eq.note,entity_id.in.(${noteIds.join(',')}))`)
-            }
-            if (taskIds.length > 0) {
-                chunks.push(`and(entity_type.eq.task,entity_id.in.(${taskIds.join(',')}))`)
-            }
-
-            query = query.or(chunks.join(','))
-            const { data: acts } = await query
-            setActivities(acts ?? [])
-        }
-
-        fetchActivities().catch(() => setActivities([]))
+        fetchClientActivities(clientId)
+            .then(acts => setActivities(acts))
+            .catch(() => setActivities([]))
     }, [client?.id, deals])
 
     async function handleSave() {
@@ -514,6 +480,10 @@ export default function ClientDetailPage() {
                                     <FileText size={14} className="mr-1.5" />
                                     Notes
                                 </TabsTrigger>
+                                <TabsTrigger value="service" id="tab-service">
+                                    <RefreshCw size={14} className="mr-1.5" />
+                                    Service
+                                </TabsTrigger>
                                 <TabsTrigger value="activity" id="tab-activity">
                                     <Activity size={14} className="mr-1.5" />
                                     Activity
@@ -770,11 +740,17 @@ export default function ClientDetailPage() {
                         {client && <NotesList entityType="client" entityId={client.id} orgId={client.org_id} inlineAdd onActivityAdded={handleActivityAdded} />}
                     </TabsContent >
 
+                    {/* Service */}
+                    <TabsContent value="service">
+                        {client && <ServiceRecordList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
+
                     {/* Activity */}
                     < TabsContent value="activity" >
                         <ActivityTimeline
                             activities={activities}
                             contextDeals={contextDeals}
+                            showActorNames
                         />
                     </TabsContent >
 
