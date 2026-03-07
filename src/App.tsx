@@ -10,6 +10,8 @@ import PipelinePage from './pages/app/pipeline/PipelinePage'
 import TasksPage from './pages/app/tasks/TasksPage'
 import NotesPage from './pages/app/notes/NotesPage'
 import NoteDetailPage from './pages/app/notes/NoteDetailPage'
+import PoliciesPage from './pages/app/policies/PoliciesPage'
+import ServicingPage from './pages/app/servicing/ServicingPage'
 import RulesPage from './pages/app/settings/RulesPage'
 import NetworkPage from './pages/app/network/NetworkPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -36,6 +38,8 @@ export default function App() {
         <Route path="clients" element={<ClientsPage />} />
         <Route path="clients/:clientId" element={<ClientDetailPage />} />
         <Route path="pipeline" element={<PipelinePage />} />
+        <Route path="policies" element={<PoliciesPage />} />
+        <Route path="servicing" element={<ServicingPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="notes/:noteId" element={<NoteDetailPage />} />

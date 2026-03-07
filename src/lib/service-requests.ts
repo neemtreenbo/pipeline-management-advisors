@@ -71,7 +71,7 @@ export interface ServiceRequest {
     created_at: string
     updated_at: string
     // joined
-    client?: { id: string; name: string; email: string | null }
+    client?: { id: string; name: string; email: string | null; profile_picture_url: string | null }
     policy?: { id: string; policy_number: string | null; product: string | null } | null
 }
 
@@ -110,7 +110,7 @@ export async function fetchServiceRequests(
         .from('service_requests')
         .select(`
             *,
-            client:clients(id, name, email),
+            client:clients(id, name, email, profile_picture_url),
             policy:policies(id, policy_number, product)
         `)
         .eq('org_id', orgId)
@@ -132,7 +132,7 @@ export async function fetchServiceRequestsByClient(clientId: string): Promise<Se
         .from('service_requests')
         .select(`
             *,
-            client:clients(id, name, email),
+            client:clients(id, name, email, profile_picture_url),
             policy:policies(id, policy_number, product)
         `)
         .eq('client_id', clientId)
@@ -148,7 +148,7 @@ export async function fetchServiceRequestsByPolicy(policyId: string): Promise<Se
         .from('service_requests')
         .select(`
             *,
-            client:clients(id, name, email),
+            client:clients(id, name, email, profile_picture_url),
             policy:policies(id, policy_number, product)
         `)
         .eq('policy_id', policyId)
@@ -164,7 +164,7 @@ export async function fetchServiceRequestById(id: string): Promise<ServiceReques
         .from('service_requests')
         .select(`
             *,
-            client:clients(id, name, email),
+            client:clients(id, name, email, profile_picture_url),
             policy:policies(id, policy_number, product)
         `)
         .eq('id', id)
@@ -192,7 +192,7 @@ export async function createServiceRequest(input: NewServiceRequestInput): Promi
         })
         .select(`
             *,
-            client:clients(id, name, email),
+            client:clients(id, name, email, profile_picture_url),
             policy:policies(id, policy_number, product)
         `)
         .single()

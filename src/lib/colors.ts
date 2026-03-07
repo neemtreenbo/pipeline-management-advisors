@@ -48,6 +48,25 @@ export const STAGE_COLORS: Record<DealStage, AccentColor> = {
     'Closed':               ACCENT_PALETTE.green,
 }
 
+// ─── Service request status colors ──────────────────────────────────────────
+export const SERVICE_STATUS_COLORS: Record<string, AccentColor> = {
+    'New':                ACCENT_PALETTE.blue,
+    'Pending Documents':  ACCENT_PALETTE.gold,
+    'Ready to Submit':    ACCENT_PALETTE.purple,
+    'Submitted':          ACCENT_PALETTE.cyan,
+    'In Progress':        ACCENT_PALETTE.orange,
+    'Completed':          ACCENT_PALETTE.green,
+    'Rejected':           ACCENT_PALETTE.teal,
+}
+
+// ─── Service request priority colors ────────────────────────────────────────
+export const SERVICE_PRIORITY_COLORS: Record<string, AccentColor> = {
+    'low':    ACCENT_PALETTE.cyan,
+    'medium': ACCENT_PALETTE.blue,
+    'high':   ACCENT_PALETTE.orange,
+    'urgent': ACCENT_PALETTE.purple,
+}
+
 // ─── Client source colors ───────────────────────────────────────────────────
 export const SOURCE_COLORS: Record<string, AccentColor> = {
     referral:     ACCENT_PALETTE.green,

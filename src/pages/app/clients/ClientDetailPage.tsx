@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Tag, Briefcase, FileText, CheckSquare, Activity, LayoutGrid, Edit2, Check, X, Linkedin, Instagram, Trash2, Brain, Shield, ClipboardList } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
@@ -21,6 +21,8 @@ import NotesList from '@/components/notes/NotesList'
 import EntityTasks from '@/components/tasks/EntityTasks'
 import ClientRelationships from '@/components/clients/ClientRelationships'
 import Mindmap from '@/components/mindmap'
+import ClientPoliciesList from '@/components/policies/ClientPoliciesList'
+import ClientServiceRequestsList from '@/components/servicing/ClientServiceRequestsList'
 
 function formatSource(src: string | null) {
     if (!src) return '—'
@@ -506,6 +508,14 @@ export default function ClientDetailPage() {
                                     <Briefcase size={14} className="mr-1.5" />
                                     Deals
                                 </TabsTrigger>
+                                <TabsTrigger value="policies" id="tab-policies">
+                                    <Shield size={14} className="mr-1.5" />
+                                    Policies
+                                </TabsTrigger>
+                                <TabsTrigger value="servicing" id="tab-servicing">
+                                    <ClipboardList size={14} className="mr-1.5" />
+                                    Servicing
+                                </TabsTrigger>
                                 <TabsTrigger value="tasks" id="tab-tasks">
                                     <CheckSquare size={14} className="mr-1.5" />
                                     Tasks
@@ -758,6 +768,16 @@ export default function ClientDetailPage() {
                     {/* Deals */}
                     <TabsContent value="deals">
                         {client && <InlineDealsList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
+
+                    {/* Policies */}
+                    <TabsContent value="policies">
+                        {client && <ClientPoliciesList clientId={client.id} orgId={client.org_id} />}
+                    </TabsContent>
+
+                    {/* Servicing */}
+                    <TabsContent value="servicing">
+                        {client && <ClientServiceRequestsList clientId={client.id} orgId={client.org_id} />}
                     </TabsContent>
 
                     {/* Tasks */}
